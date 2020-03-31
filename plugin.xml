@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<?eclipse version="3.4"?>
+<plugin>
+   <extension
+         point="org.adempiere.base.IColumnCallout">
+      <callout
+            class="net.frontuari.callout.FTU_SetProductionValues"
+            columnName="ProductionQty"
+            priority="1"
+            tableName="M_Production">
+      </callout>
+      <callout
+            class="net.frontuari.callout.FTU_SetProductionValues"
+            columnName="M_Product_ID"
+            tableName="M_Production">
+      </callout>
+   </extension>
+
+</plugin>
