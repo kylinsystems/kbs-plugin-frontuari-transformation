@@ -250,6 +250,7 @@ public class FTUMProduction extends MProduction implements DocAction {
 				pc.setAD_OrgTrx_ID(getAD_Org_ID());
 				pc.setC_DocTypeTarget_ID(docTypeId);
 				pc.setC_DocType_ID(0);
+				pc.setDateAcct(new Timestamp(System.currentTimeMillis()));
 				
 				sql = "SELECT MAX(BSCA_ProductValue_ID) FROM BSCA_ProductValue WHERE Value='"+prod.getSKU()+"'";
 				int BSCA_ProductValue_ID = DB.getSQLValue(get_TrxName(), sql);
@@ -297,6 +298,16 @@ public class FTUMProduction extends MProduction implements DocAction {
 					pc.setBSCA_ProfitPriceListEntered(profit);
 					pc.setBSCA_ProfitPriceStdEntered(profit);
 					amount = amount.add(profit);
+				}else{
+					pc.setPercentageProfitPLimit(BigDecimal.ZERO);
+					pc.setPercentageProfitPList(BigDecimal.ZERO);
+					pc.setPercentageProfitPStd(BigDecimal.ZERO);
+					pc.setBSCA_ProfitPriceLimit(BigDecimal.ZERO);
+					pc.setBSCA_ProfitPriceList(BigDecimal.ZERO);
+					pc.setBSCA_ProfitPriceStd(BigDecimal.ZERO);
+					pc.setBSCA_ProfitPriceLimitEntered(BigDecimal.ZERO);
+					pc.setBSCA_ProfitPriceListEntered(BigDecimal.ZERO);
+					pc.setBSCA_ProfitPriceStdEntered(BigDecimal.ZERO);
 				}
 				
 				pc.setPriceListEntered(amount);
@@ -323,6 +334,10 @@ public class FTUMProduction extends MProduction implements DocAction {
 					pc.setTaxAmtPriceStd(profit);
 					
 					amount = amount.add(profit);
+				}else{
+					pc.setTaxAmtPriceLimit(BigDecimal.ZERO);
+					pc.setTaxAmtPriceList(BigDecimal.ZERO);
+					pc.setTaxAmtPriceStd(BigDecimal.ZERO);
 				}
 				
 				pc.setPriceListWTax(amount);

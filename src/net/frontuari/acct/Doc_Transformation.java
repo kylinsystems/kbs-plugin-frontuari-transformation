@@ -2,8 +2,10 @@ package net.frontuari.acct;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
+import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.Map;
 import java.util.logging.Level;
 
@@ -18,6 +20,7 @@ import org.compiere.model.MFactAcct;
 import org.compiere.model.ProductCost;
 import org.compiere.model.X_M_Production;
 import org.compiere.model.X_M_ProductionLine;
+import org.compiere.util.DB;
 import org.compiere.util.Env;
 
 public class Doc_Transformation extends Doc_Production{
@@ -30,6 +33,96 @@ public class Doc_Transformation extends Doc_Production{
 		// TODO Auto-generated constructor stub
 	}
 	
+	/**
+	 *  Load Document Details
+	 *  @return error message or null
+	 */
+	protected String loadDocumentDetails()
+	{
+		setC_Currency_ID (NO_CURRENCY);
+		X_M_Production prod = (X_M_Production)getPO();
+		setDateDoc (prod.getMovementDate());
+		setDateAcct(prod.getMovementDate());
+		//	Contained Objects
+		p_lines = loadLines(prod);
+		if (log.isLoggable(Level.FINE)) log.fine("Lines=" + p_lines.length);
+		return null;
+	}   //  loadDocumentDetails
+
+	
+	
+	/**
+	 *	Load Invoice Line
+	 *	@param prod production
+	 *  @return DoaLine Array
+	 */
+	private DocLine[] loadLines(X_M_Production prod)
+	{
+		ArrayList<DocLine> list = new ArrayList<DocLine>();
+		mQtyProduced = new HashMap<>(); 
+		String sqlPL = null;
+		if (prod.isUseProductionPlan()){
+//			Production
+			//	-- ProductionLine	- the real level
+			sqlPL = "SELECT * FROM "
+							+ " M_ProductionLine pro_line INNER JOIN M_ProductionPlan plan ON pro_line.M_ProductionPlan_id = plan.M_ProductionPlan_id "
+							+ " INNER JOIN M_Production pro ON pro.M_Production_id = plan.M_Production_id "
+							+ " WHERE pro.M_Production_ID=? "
+							+ " ORDER BY plan.M_ProductionPlan_id, pro_line.Line";
+		}else{
+//			Production
+			//	-- ProductionLine	- the real level
+			sqlPL = "SELECT * FROM M_ProductionLine pl "
+					+ "WHERE pl.M_Production_ID=? "
+					+ "ORDER BY pl.Line";
+		}
+		
+		PreparedStatement pstmtPL = null;
+		ResultSet rsPL = null;
+		try
+		{			
+			pstmtPL = DB.prepareStatement(sqlPL, getTrxName());
+			pstmtPL.setInt(1,get_ID());
+			rsPL = pstmtPL.executeQuery();
+			while (rsPL.next())
+			{
+				X_M_ProductionLine line = new X_M_ProductionLine(getCtx(), rsPL, getTrxName());
+				if (line.getMovementQty().signum() == 0)
+				{
+					if (log.isLoggable(Level.INFO)) log.info("LineQty=0 - " + line);
+					continue;
+				}
+				DocLine docLine = new DocLine (line, this);
+				docLine.setQty (line.getMovementQty(), false);
+				//	Identify finished BOM Product
+				if (prod.isUseProductionPlan())
+					docLine.setProductionBOM(line.getM_Product_ID() == line.getM_ProductionPlan().getM_Product_ID());
+				else
+					docLine.setProductionBOM(line.getM_Product_ID() == prod.getM_Product_ID());
+				
+				if (docLine.isProductionBOM()){
+					manipulateQtyProduced (mQtyProduced, line, prod.isUseProductionPlan(), line.getMovementQty());
+				}
+				//
+				if (log.isLoggable(Level.FINE)) log.fine(docLine.toString());
+				list.add (docLine);
+			}
+		}
+		catch (Exception ee)
+		{
+			log.log(Level.SEVERE, sqlPL, ee);
+		}
+		finally
+		{
+			DB.close(rsPL, pstmtPL);
+			rsPL = null;
+			pstmtPL = null;
+		}
+			
+		DocLine[] dl = new DocLine[list.size()];
+		list.toArray(dl);
+		return dl;
+	}	//	loadLines
 	
 	
 	/**
@@ -93,6 +186,13 @@ public class Doc_Transformation extends Doc_Production{
 						  parentLine=p_lines[i];
 					  }
 				  }
+		}else{
+			for (int i = 0; i < p_lines.length; i++){
+				  DocLine line = p_lines[i];
+				  if(line.getProduct().getM_Product_ID()==prod.getM_Product_ID()){
+					  parentLine=p_lines[i];
+				  }
+			  }
 		}	
 		
 		for (int i = 0; i < p_lines.length; i++){

@@ -52,7 +52,15 @@ public class FTU_SetProductionValues implements IColumnCallout {
 
 					String Modality = product.get_ValueAsString("Modality");
 					mTab.setValue("Modality", Modality);
-					boolean isTransformation= (boolean)mTab.getValue("IsTransformation");
+					
+					boolean isTransformation= false;
+					try{
+						isTransformation= (boolean)mTab.getValue("IsTransformation");
+					}catch(Exception e){
+						isTransformation= false;
+					}
+					
+					
 					if(isTransformation){
 					int orgId = (int)mTab.getValue("AD_Org_ID");
 					int asId = Env.getContextAsInt(ctx, "$"+MAcctSchema.COLUMNNAME_C_AcctSchema_ID);
@@ -67,19 +75,35 @@ public class FTU_SetProductionValues implements IColumnCallout {
 						mTab.setValue("PriceActual", costs);
 					}
 					
-					String sql = "SELECT MAX(il.C_Invoice_ID) FROM C_InvoiceLine il "
-							+ " INNER JOIN C_Invoice i ON il.C_Invoice_ID=i.C_Invoice_ID"
-							+ " WHERE il.M_Product_ID = "+M_Product_ID+" AND i.DocStatus = 'CO'"
-							+ " AND i.AD_Org_ID="+orgId+"AND il.IsActive = 'Y' AND i.IsSOTrx='N' ";
+					int invoiceId = 0;
 					
-					int invoiceId = DB.getSQLValue(null, sql);
+					String sql = "select coalesce(il.c_invoice_id,0) as c_invoice_id from FTU_LastProductDocument ld "+
+							"left join c_invoiceline il on il.c_invoiceline_id = ld.lastinvoiceline_id "+
+							"where ld.m_product_id = "+M_Product_ID+" and ld.ad_org_id = "+orgId+" and ld.issotrx ='N' and ld.isactive ='Y'"
+							;
+					invoiceId = DB.getSQLValue(null, sql);
+					if(!(invoiceId>0)){
+						sql = "SELECT MAX(il.C_Invoice_ID) FROM C_InvoiceLine il "
+								+ " INNER JOIN C_Invoice i ON il.C_Invoice_ID=i.C_Invoice_ID"
+								+ " WHERE il.M_Product_ID = "+M_Product_ID+" AND i.DocStatus = 'CO'"
+								+ " AND i.AD_Org_ID="+orgId+"AND il.IsActive = 'Y' AND i.IsSOTrx='N' ";
+						
+					}
+					
+					invoiceId = DB.getSQLValue(null, sql);
 					
 					if(invoiceId>0){
 						mTab.setValue("C_Invoice_ID", invoiceId);
-
-						sql = "SELECT priceentered FROM C_InvoiceLine il WHERE C_Invoice_ID="+invoiceId
-						+ " AND M_Product_ID="+M_Product_ID;
+												
+						sql = "SELECT COALESCE((case when p.c_uom_id<>il.c_uom_id then round(il.priceentered*c.MultiplyRate,2)"+
+								"	else il.priceentered end),0) as priceentered FROM C_InvoiceLine il "+
+								"	inner join m_product p on il.m_product_id=p.m_product_id"+
+								"	left join c_uom_conversion c on p.m_product_id=c.m_product_id and c.c_uom_id= p.c_uom_id and c.c_uom_to_id=il.c_uom_id"+
+								"	WHERE il.C_Invoice_ID="+invoiceId+
+								"	AND il.M_Product_ID="+M_Product_ID;
 						BigDecimal price = DB.getSQLValueBD(null, sql);
+						
+						
 						if(price.compareTo(BigDecimal.ZERO)>0){
 							mTab.setValue("AmountInvoiced", price);
 						}
@@ -145,7 +169,12 @@ public class FTU_SetProductionValues implements IColumnCallout {
 				
 				if(mTab.getValue(MProduction.COLUMNNAME_ProductionQty) == null)
 					return null;
-				boolean isTransformation= (boolean)mTab.getValue("isTransformation");//((String)mTab.getValue("isTransformation")).equals("Y");
+				boolean isTransformation= false;
+				try{
+					isTransformation= (boolean)mTab.getValue("IsTransformation");
+				}catch(Exception e){
+					isTransformation= false;
+				}
 				if(isTransformation){
 				BigDecimal productionQty = (BigDecimal) value;
 
