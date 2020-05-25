@@ -1,6 +1,8 @@
 package net.frontuari.callout;
 
 import java.math.BigDecimal;
+import java.sql.PreparedStatement;
+import java.sql.ResultSet;
 import java.util.Properties;
 
 import org.adempiere.base.IColumnCallout;
@@ -75,7 +77,7 @@ public class FTU_SetProductionValues implements IColumnCallout {
 						mTab.setValue("PriceActual", costs);
 					}
 					
-					int invoiceId = 0;
+					/*int invoiceId = 0;
 					
 					String sql = "select coalesce(il.c_invoice_id,0) as c_invoice_id from FTU_LastProductDocument ld "+
 							"left join c_invoiceline il on il.c_invoiceline_id = ld.lastinvoiceline_id "+
@@ -107,6 +109,48 @@ public class FTU_SetProductionValues implements IColumnCallout {
 						if(price.compareTo(BigDecimal.ZERO)>0){
 							mTab.setValue("AmountInvoiced", price);
 						}
+					}*/
+					String sql = "SELECT inv.c_invoiceline_id,trans.m_productionline_id,prod.m_product_id,"
+							+ " COALESCE((CASE "
+							+ "  WHEN inv.dateacct=trans.movementdate THEN (CASE WHEN inv.processedon>trans.processedon THEN inv.priceentered ELSE trans.pricelastinv END)"
+							+ "  WHEN  inv.c_invoiceline_id>0 AND trans.m_productionline_id>0 THEN (CASE WHEN inv.dateacct>trans.movementdate THEN inv.priceentered ELSE trans.pricelastinv END)"
+							+ "  WHEN inv.c_invoiceline_id>0 THEN inv.priceentered WHEN trans.m_productionline_id>0 THEN trans.pricelastinv ELSE 0 END),0) AS price "
+							+ " FROM m_product prod "
+							+ " LEFT JOIN ( SELECT i.dateacct,p.m_product_id,il.c_invoiceline_id, "
+								+ " CASE WHEN il.c_invoiceline_id > 0 THEN COALESCE((case when p.c_uom_id<>il.c_uom_id then round(il.priceentered*c.MultiplyRate,2) "
+								+ " ELSE il.priceentered end),0) ELSE 0 END as priceentered, to_timestamp(i.processedon /1000) AS processedon "
+								+ " FROM FTU_LastProductDocument ld "
+								+ " INNER JOIN m_product p ON ld.m_product_id = p.m_product_id "
+								+ " LEFT JOIN c_invoiceline il on il.c_invoiceline_id = ld.lastinvoiceline_id"
+								+ " LEFT JOIN c_invoice i ON il.c_invoice_id = i.c_invoice_id"
+								+ " LEFT JOIN c_uom_conversion c on ld.m_product_id=c.m_product_id and c.c_uom_id= p.c_uom_id and c.c_uom_to_id=il.c_uom_id "
+								+ " WHERE ld.m_product_id ="+M_Product_ID+" and ld.ad_org_id = "+orgId+" and ld.issotrx ='N' and ld.isactive ='Y' "
+							+ " ) AS inv ON prod.m_product_id =inv.m_product_id LEFT JOIN ("
+								+ " SELECT mpl.m_product_id ,mpl.m_productionline_id,mp.movementdate,mpl.pricelastinv, to_timestamp(mp.processedon /1000) AS processedon "
+								+ " FROM m_productionline mpl"
+								+ " INNER JOIN m_production mp ON mpl.m_production_id = mp.m_production_id"
+								+ " WHERE mpl.m_product_id ="+M_Product_ID+" AND mp.ad_org_id = "+orgId+" AND mp.istransformation ='Y' AND mp.docstatus IN ('CO','CL')"
+								+ " AND mpl.isendproduct = 'Y' ORDER BY mp.movementdate DESC /*LIMIT 1*/"
+							+ ") AS trans ON prod.m_product_id = trans.m_product_id WHERE prod.m_product_id="+M_Product_ID
+							+" ORDER BY inv.c_invoiceline_id,trans.m_productionline_id DESC";
+					PreparedStatement pstmt= null;
+					ResultSet rs =null;
+					try{
+						pstmt = DB.prepareStatement(sql,null);
+						 rs = pstmt.executeQuery();
+						 if(rs.next()){
+							 BigDecimal price = rs.getBigDecimal("price");
+							 
+							 if(price.compareTo(BigDecimal.ZERO)>0)
+									mTab.setValue("AmountInvoiced", price);
+					 		 else
+					 			return "No se encontro el ultimo precio de compra";
+						 }else{
+							 return "No se encontro el ultimo precio de compra";
+						 }
+					 
+					}catch(Exception e){
+						return "No se encontro el ultimo precio de compra "+e.toString();
 					}
 					
 					int userId = product.get_ValueAsInt("User1_ID");

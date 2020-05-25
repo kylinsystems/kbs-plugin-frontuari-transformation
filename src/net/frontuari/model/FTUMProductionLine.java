@@ -208,7 +208,9 @@ public class FTUMProductionLine extends MProductionLine{
 			if (mustBeStocked && qtyToMove.signum() > 0)
 			{
 				MLocator loc = new MLocator(getCtx(), getM_Locator_ID(), get_TrxName());
-				errorString.append( "Insufficient qty on hand of " + prod.toString() + " at "
+				/*errorString.append( "Insufficient qty on hand of " + prod.toString() + " at "
+						+ loc.toString() + "\n");*/
+				errorString.append( "No hay suficientes cantidades del producto " + prod.getSKU()+ " " +prod.getName()+ " en la ubicacion "
 						+ loc.toString() + "\n");
 			}
 			else
@@ -553,15 +555,16 @@ public class FTUMProductionLine extends MProductionLine{
 				
 				movementQty = getQtyUsed();
 				
-			}else{
+			}else if (isTransformation){
 			
 			MProduct fatherProd = new MProduct(getCtx(),productionParent.getM_Product_ID(),get_TrxName());
 			
 			String sql = "SELECT PerformanceFactor FROM M_Product_BOM WHERE M_Product_ID="+fatherProd.get_ID()+" "
 					+ " AND M_ProductBOM_ID = "+getM_Product_ID();
 			
-			BigDecimal conversionFactor = DB.getSQLValueBD(get_TrxName(), sql);
-			
+			BigDecimal conversionFactor = DB.getSQLValueBD(get_TrxName(), sql);// PerformanceFactor
+			//BigDecimal conversionFactor = get_Value("PerformanceFactor")!=null?(BigDecimal)get_Value("PerformanceFactor"):BigDecimal.ZERO ;
+								
 			setDescription("Factor de Conversión:"+conversionFactor);
 			
 			BigDecimal qtyUsed = getQtyUsed();

@@ -358,7 +358,7 @@ public class ProductionCreate extends FTUProcess {
 
 			// products used in production
 			String sql = " SELECT M_ProductBom_ID, BOMQty, PerformanceFactor FROM M_Product_BOM "
-					+ " WHERE M_Product_ID=" + finishedProduct.getM_Product_ID() + " AND (AD_Org_ID = 0 OR AD_Org_ID = " + m_production.getAD_Org_ID() + ") "
+					+ " WHERE M_Product_ID=" + finishedProduct.getM_Product_ID() + " AND isactive='Y' AND (AD_Org_ID = 0 OR AD_Org_ID = " + m_production.getAD_Org_ID() + ") "
 					+ " ORDER BY Line";
 
 			PreparedStatement pstmt = null;
@@ -460,6 +460,17 @@ public class ProductionCreate extends FTUProcess {
 								lineno = lineno + 10;
 								count++;
 							} else {
+								FTUMProductionLine BOMLine = new FTUMProductionLine(m_production);
+								BOMLine.setLine( lineno );
+								BOMLine.setM_Product_ID(BOMProduct_ID);
+								BOMLine.setM_Locator_ID(defaultLocator);  
+								BOMLine.setQtyUsed(BOMMovementQty);
+								BOMLine.setPlannedQty(BOMMovementQty);
+								BOMLine.saveEx(get_TrxName());
+
+								lineno = lineno + 10;
+								count++;							
+								/**
 								// BOM stock info
 								MStorageOnHand[] storages = null;
 								MProduct usedProduct = MProduct.get(getCtx(), BOMProduct_ID);
@@ -558,6 +569,11 @@ public class ProductionCreate extends FTUProcess {
 										throw new AdempiereUserError("Not enough stock of " + BOMProduct_ID);
 									}
 								}
+								
+								
+								
+								
+								**/
 							}
 						}
 						

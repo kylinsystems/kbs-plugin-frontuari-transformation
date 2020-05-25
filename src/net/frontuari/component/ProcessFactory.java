@@ -19,9 +19,9 @@
 package net.frontuari.component;
 
 import net.frontuari.base.FTUProcessFactory;
-
 import net.frontuari.process.FTU_CompleteProduction;
 import net.frontuari.process.ProductionCreate;
+import net.frontuari.process.ProductionCreateSimple;
 /**
  * Process Factory
  */
@@ -39,6 +39,7 @@ public class ProcessFactory extends FTUProcessFactory {
 	@Override
 	protected void initialize() {
 		registerProcess(ProductionCreate.class);
+		registerProcess(ProductionCreateSimple.class);
 		registerProcess(FTU_CompleteProduction.class);
 	}
 
