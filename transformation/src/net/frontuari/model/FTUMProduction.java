@@ -542,7 +542,7 @@ public int createLines(boolean mustBeStocked) {
 		int asi = 0;
 
 		// products used in production
-		String sql = "SELECT M_Product_ID, QtyBOM, C_UOM_ID" + " FROM PP_Product_BOMLine"
+		String sql = "SELECT M_Product_ID, QtyBOM, C_UOM_ID,IsQtyPercentage" + " FROM PP_Product_BOMLine"
 				+ " WHERE PP_Product_BOM_ID=" + PP_Product_BOM_ID + " ORDER BY Line";
 
 		PreparedStatement pstmt = null;
@@ -558,6 +558,11 @@ public int createLines(boolean mustBeStocked) {
 				int BOMProduct_ID = rs.getInt(1);
 				BigDecimal BOMQty = rs.getBigDecimal(2);
 				int C_UOM_ID = rs.getInt(3);
+				boolean isQtyPercentage = rs.getBoolean("IsQtyPercentage");
+				
+				if(isQtyPercentage)
+					BOMQty= BOMQty.divide(new BigDecimal(100),2, RoundingMode.HALF_UP);
+				
 				BigDecimal BOMMovementQty = BOMQty.multiply(requiredQty);
 				
 				MProduct bomproduct = new MProduct(Env.getCtx(), BOMProduct_ID, get_TrxName());
@@ -843,7 +848,7 @@ public int createLines(boolean mustBeStocked) {
 		//int asi = 0;
 
 		// products used in production
-		String sql = " SELECT M_ProductBom_ID, BOMQty, Scrap, C_UOM_ID FROM M_Product_BOM "
+		String sql = " SELECT M_ProductBom_ID, BOMQty, Scrap, C_UOM_ID,IsQtyPercentage FROM M_Product_BOM "
 				+ " WHERE M_Product_ID=" + finishedProduct.getM_Product_ID() + " AND isactive='Y' AND (AD_Org_ID = 0 OR AD_Org_ID = " + getAD_Org_ID() + ") "
 				+ " ORDER BY Line";
 
@@ -859,6 +864,10 @@ public int createLines(boolean mustBeStocked) {
 				int BOMProduct_ID = rs.getInt(1);
 				BigDecimal BOMQty = rs.getBigDecimal(2);
 				int C_UOM_ID = rs.getInt(4);
+				boolean isQtyPercentage = rs.getBoolean("IsQtyPercentage");
+				if(isQtyPercentage)
+					BOMQty= BOMQty.divide(new BigDecimal(100),2, RoundingMode.HALF_UP);
+				
 				BigDecimal BOMMovementQty = BOMQty.multiply(requiredQty);
 				
 				MProduct bomproduct = new MProduct(Env.getCtx(), BOMProduct_ID, get_TrxName());

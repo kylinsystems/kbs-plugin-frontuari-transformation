@@ -100,12 +100,12 @@ public class ProductionPreview extends CustomProcess {
 			
 			String sql = "SELECT * FROM ftu_rv_productionpreview";
 			
-			String whereClause = " WHERE M_Product_ID="+p_M_Product_ID;
+			String whereClause = " WHERE M_Product_ID="+p_M_Product_ID +" AND AD_Client_ID="+getAD_Client_ID();
 			
 			if(p_PP_Product_BOM_ID>0)
 				whereClause += " AND PP_Product_BOM_ID="+p_PP_Product_BOM_ID;
 			if(p_TrxType.length()>0)
-				whereClause += " AND TrxType="+p_TrxType;
+				whereClause += " AND productionmethod='"+p_TrxType+"'";
 			if(p_M_Locator_ID>0)
 				whereClause += " AND M_Locator_ID="+p_M_Locator_ID;
 			if(p_M_Warehouse_ID>0)
@@ -219,7 +219,7 @@ public class ProductionPreview extends CustomProcess {
 				if(p_TrxType.equalsIgnoreCase("P")) {
 					priceActual = totalAmt.divide(p_ProductionQty,4, RoundingMode.HALF_UP);
 				}
-				sql = "UPDATE ftu_rv_productionpreview SET TotalAmt="+totalAmt+",TotalPrice="+priceActual+" WHERE AD_PInstance_ID="+getAD_PInstance_ID();
+				sql = "UPDATE ftu_r_productionpreview SET TotalAmt="+totalAmt+",TotalPrice="+priceActual+" WHERE AD_PInstance_ID="+getAD_PInstance_ID();
 				DB.executeUpdateEx(sql, get_TrxName());
 				
 				
@@ -240,6 +240,7 @@ public class ProductionPreview extends CustomProcess {
 		}
 		
 		public void createProduction() {
+			MProduct prod = new MProduct(getCtx(),p_M_Product_ID,get_TrxName());
 			m_production = new FTUMProduction(getCtx(),0,get_TrxName());
 			m_production.setAD_Org_ID(p_AD_Org_ID);
 			m_production.setM_Locator_ID(p_M_Locator_ID);
@@ -247,6 +248,7 @@ public class ProductionPreview extends CustomProcess {
 			m_production.setMovementDate(p_DateDoc);
 			m_production.setDatePromised(p_DateDoc);
 			m_production.setProductionQty(p_ProductionQty);
+			m_production.set_ValueOfColumn("C_UOM_ID", prod.getC_UOM_ID());
 			m_production.saveEx(get_TrxName());
 			if(p_TrxType.equalsIgnoreCase("P"))
 				m_production.createProductionLines(false, p_PP_Product_BOM_ID);

@@ -17,6 +17,7 @@
 package net.frontuari.model;
 
 import java.math.BigDecimal;
+import java.sql.Timestamp;
 import org.compiere.model.*;
 import org.compiere.util.KeyNamePair;
 
@@ -41,6 +42,14 @@ public interface I_FTU_R_ProductionPreview
     BigDecimal accessLevel = BigDecimal.valueOf(3);
 
     /** Load Meta Data */
+
+    /** Column name AD_Client_ID */
+    public static final String COLUMNNAME_AD_Client_ID = "AD_Client_ID";
+
+	/** Get Client.
+	  * Client/Tenant for this installation.
+	  */
+	public int getAD_Client_ID();
 
     /** Column name AD_Org_ID */
     public static final String COLUMNNAME_AD_Org_ID = "AD_Org_ID";
@@ -110,6 +119,22 @@ public interface I_FTU_R_ProductionPreview
 	/** Get bom_uomsymbol	  */
 	public String getbom_uomsymbol();
 
+    /** Column name Created */
+    public static final String COLUMNNAME_Created = "Created";
+
+	/** Get Created.
+	  * Date this record was created
+	  */
+	public Timestamp getCreated();
+
+    /** Column name CreatedBy */
+    public static final String COLUMNNAME_CreatedBy = "CreatedBy";
+
+	/** Get Created By.
+	  * User who created this records
+	  */
+	public int getCreatedBy();
+
     /** Column name DivideRate */
     public static final String COLUMNNAME_DivideRate = "DivideRate";
 
@@ -135,6 +160,37 @@ public interface I_FTU_R_ProductionPreview
 	  * Document sequence number of the document
 	  */
 	public String getDocumentNo();
+
+    /** Column name FTU_R_ProductionPreview_ID */
+    public static final String COLUMNNAME_FTU_R_ProductionPreview_ID = "FTU_R_ProductionPreview_ID";
+
+	/** Set ProductionPreview	  */
+	public void setFTU_R_ProductionPreview_ID (int FTU_R_ProductionPreview_ID);
+
+	/** Get ProductionPreview	  */
+	public int getFTU_R_ProductionPreview_ID();
+
+    /** Column name FTU_R_ProductionPreview_UU */
+    public static final String COLUMNNAME_FTU_R_ProductionPreview_UU = "FTU_R_ProductionPreview_UU";
+
+	/** Set FTU_R_ProductionPreview_UU	  */
+	public void setFTU_R_ProductionPreview_UU (String FTU_R_ProductionPreview_UU);
+
+	/** Get FTU_R_ProductionPreview_UU	  */
+	public String getFTU_R_ProductionPreview_UU();
+
+    /** Column name IsActive */
+    public static final String COLUMNNAME_IsActive = "IsActive";
+
+	/** Set Active.
+	  * The record is active in the system
+	  */
+	public void setIsActive (boolean IsActive);
+
+	/** Get Active.
+	  * The record is active in the system
+	  */
+	public boolean isActive();
 
     /** Column name IsBOM */
     public static final String COLUMNNAME_IsBOM = "IsBOM";
@@ -228,6 +284,21 @@ public interface I_FTU_R_ProductionPreview
 	public int getM_Product_ID();
 
 	public org.compiere.model.I_M_Product getM_Product() throws RuntimeException;
+
+    /** Column name M_Production_ID */
+    public static final String COLUMNNAME_M_Production_ID = "M_Production_ID";
+
+	/** Set Production.
+	  * Plan for producing a product
+	  */
+	public void setM_Production_ID (int M_Production_ID);
+
+	/** Get Production.
+	  * Plan for producing a product
+	  */
+	public int getM_Production_ID();
+
+	public org.compiere.model.I_M_Production getM_Production() throws RuntimeException;
 
     /** Column name M_Warehouse_ID */
     public static final String COLUMNNAME_M_Warehouse_ID = "M_Warehouse_ID";
@@ -480,6 +551,31 @@ public interface I_FTU_R_ProductionPreview
 	  * Total Amount
 	  */
 	public BigDecimal getTotalAmt();
+
+    /** Column name TotalPrice */
+    public static final String COLUMNNAME_TotalPrice = "TotalPrice";
+
+	/** Set Total Price	  */
+	public void setTotalPrice (BigDecimal TotalPrice);
+
+	/** Get Total Price	  */
+	public BigDecimal getTotalPrice();
+
+    /** Column name Updated */
+    public static final String COLUMNNAME_Updated = "Updated";
+
+	/** Get Updated.
+	  * Date this record was updated
+	  */
+	public Timestamp getUpdated();
+
+    /** Column name UpdatedBy */
+    public static final String COLUMNNAME_UpdatedBy = "UpdatedBy";
+
+	/** Get Updated By.
+	  * User who updated this records
+	  */
+	public int getUpdatedBy();
 
     /** Column name warehouse_name */
     public static final String COLUMNNAME_warehouse_name = "warehouse_name";

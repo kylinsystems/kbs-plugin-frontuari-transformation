@@ -32,7 +32,7 @@ public class X_FTU_R_ProductionPreview extends PO implements I_FTU_R_ProductionP
 	/**
 	 *
 	 */
-	private static final long serialVersionUID = 20200811L;
+	private static final long serialVersionUID = 20200812L;
 
     /** Standard Constructor */
     public X_FTU_R_ProductionPreview (Properties ctx, int FTU_R_ProductionPreview_ID, String trxName)
@@ -41,6 +41,7 @@ public class X_FTU_R_ProductionPreview extends PO implements I_FTU_R_ProductionP
       /** if (FTU_R_ProductionPreview_ID == 0)
         {
 			setAD_PInstance_ID (0);
+			setFTU_R_ProductionPreview_ID (0);
         } */
     }
 
@@ -209,6 +210,40 @@ public class X_FTU_R_ProductionPreview extends PO implements I_FTU_R_ProductionP
 		return (String)get_Value(COLUMNNAME_DocumentNo);
 	}
 
+	/** Set ProductionPreview.
+		@param FTU_R_ProductionPreview_ID ProductionPreview	  */
+	public void setFTU_R_ProductionPreview_ID (int FTU_R_ProductionPreview_ID)
+	{
+		if (FTU_R_ProductionPreview_ID < 1) 
+			set_ValueNoCheck (COLUMNNAME_FTU_R_ProductionPreview_ID, null);
+		else 
+			set_ValueNoCheck (COLUMNNAME_FTU_R_ProductionPreview_ID, Integer.valueOf(FTU_R_ProductionPreview_ID));
+	}
+
+	/** Get ProductionPreview.
+		@return ProductionPreview	  */
+	public int getFTU_R_ProductionPreview_ID () 
+	{
+		Integer ii = (Integer)get_Value(COLUMNNAME_FTU_R_ProductionPreview_ID);
+		if (ii == null)
+			 return 0;
+		return ii.intValue();
+	}
+
+	/** Set FTU_R_ProductionPreview_UU.
+		@param FTU_R_ProductionPreview_UU FTU_R_ProductionPreview_UU	  */
+	public void setFTU_R_ProductionPreview_UU (String FTU_R_ProductionPreview_UU)
+	{
+		set_ValueNoCheck (COLUMNNAME_FTU_R_ProductionPreview_UU, FTU_R_ProductionPreview_UU);
+	}
+
+	/** Get FTU_R_ProductionPreview_UU.
+		@return FTU_R_ProductionPreview_UU	  */
+	public String getFTU_R_ProductionPreview_UU () 
+	{
+		return (String)get_Value(COLUMNNAME_FTU_R_ProductionPreview_UU);
+	}
+
 	/** Set Bill of Materials.
 		@param IsBOM 
 		Bill of Materials
@@ -366,6 +401,34 @@ public class X_FTU_R_ProductionPreview extends PO implements I_FTU_R_ProductionP
 	public int getM_Product_ID () 
 	{
 		Integer ii = (Integer)get_Value(COLUMNNAME_M_Product_ID);
+		if (ii == null)
+			 return 0;
+		return ii.intValue();
+	}
+
+	public org.compiere.model.I_M_Production getM_Production() throws RuntimeException
+    {
+		return (org.compiere.model.I_M_Production)MTable.get(getCtx(), org.compiere.model.I_M_Production.Table_Name)
+			.getPO(getM_Production_ID(), get_TrxName());	}
+
+	/** Set Production.
+		@param M_Production_ID 
+		Plan for producing a product
+	  */
+	public void setM_Production_ID (int M_Production_ID)
+	{
+		if (M_Production_ID < 1) 
+			set_ValueNoCheck (COLUMNNAME_M_Production_ID, null);
+		else 
+			set_ValueNoCheck (COLUMNNAME_M_Production_ID, Integer.valueOf(M_Production_ID));
+	}
+
+	/** Get Production.
+		@return Plan for producing a product
+	  */
+	public int getM_Production_ID () 
+	{
+		Integer ii = (Integer)get_Value(COLUMNNAME_M_Production_ID);
 		if (ii == null)
 			 return 0;
 		return ii.intValue();
@@ -772,6 +835,23 @@ public class X_FTU_R_ProductionPreview extends PO implements I_FTU_R_ProductionP
 	public BigDecimal getTotalAmt () 
 	{
 		BigDecimal bd = (BigDecimal)get_Value(COLUMNNAME_TotalAmt);
+		if (bd == null)
+			 return Env.ZERO;
+		return bd;
+	}
+
+	/** Set Total Price.
+		@param TotalPrice Total Price	  */
+	public void setTotalPrice (BigDecimal TotalPrice)
+	{
+		set_ValueNoCheck (COLUMNNAME_TotalPrice, TotalPrice);
+	}
+
+	/** Get Total Price.
+		@return Total Price	  */
+	public BigDecimal getTotalPrice () 
+	{
+		BigDecimal bd = (BigDecimal)get_Value(COLUMNNAME_TotalPrice);
 		if (bd == null)
 			 return Env.ZERO;
 		return bd;

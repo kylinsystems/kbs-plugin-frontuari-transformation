@@ -237,25 +237,23 @@ public class Doc_Transformation extends Doc_Production{
 					}*/
 				} else {
 											
-						X_M_ProductionLine prodLine = (X_M_ProductionLine)line.getPO();
-						BigDecimal qtyUsed = prodLine.getQtyUsed();
-						
-						if(qtyUsed.signum()==0){
-							costs = BigDecimal.ZERO;
-						}else if(qtyUsed.signum()<0 || qtyUsed.signum()>0){
-							if(parentLine.getM_Product_ID()==line.getM_Product_ID()){
-								costs = parentCosts.negate();
-							}else {
-								BigDecimal movementQty= prodLine.getMovementQty();
-								BigDecimal factor = qtyUsed.divide(movementQty,8, RoundingMode.HALF_UP);
-								costs = parentCosts.multiply(factor).setScale(8, RoundingMode.HALF_UP);
-							}
-						
+					X_M_ProductionLine prodLine = (X_M_ProductionLine)line.getPO();
+					BigDecimal qtyUsed = prodLine.getQtyUsed();
+					
+					if(qtyUsed.signum()==0){
+						costs = BigDecimal.ZERO;
+					}else if(qtyUsed.signum()<0 || qtyUsed.signum()>0){
+						if(parentLine.getM_Product_ID()==line.getM_Product_ID()){
+							costs = parentCosts;
+						}else {
+							BigDecimal movementQty= prodLine.getMovementQty();
+							BigDecimal factor = qtyUsed.divide(movementQty,8, RoundingMode.HALF_UP);
+							costs = (unitParentCosts)//.divide(qtyUsed,8, RoundingMode.HALF_UP))
+							.multiply(factor).setScale(8, RoundingMode.HALF_UP);
+							costs = costs.multiply(movementQty).setScale(8, RoundingMode.HALF_UP);
 						}
-					if(parentLine.getM_Product_ID()==line.getM_Product_ID()){
-						costs = costs.negate();
-					}
-										
+					
+					}				
 					
 				}
 				

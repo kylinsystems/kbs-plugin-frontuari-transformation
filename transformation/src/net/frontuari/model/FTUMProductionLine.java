@@ -530,17 +530,17 @@ public class FTUMProductionLine extends MProductionLine{
 					}
 					setIsEndProduct(true);
 				}else {
-					if(C_UOM_ID>0){
+					/*if(C_UOM_ID>0){
 						if(prod.getC_UOM_ID()!=C_UOM_ID) {
 							String sql = "SELECT DivideRate FROM C_UOM_Conversion WHERE M_Product_ID="+prod.getM_Product_ID()+" AND C_UOM_ID="+prod.getC_UOM_ID()+" AND C_UOM_To_ID="+C_UOM_ID;
 							BigDecimal multiplyrate = DB.getSQLValueBD(get_TrxName(), sql);
 							if(multiplyrate.compareTo(BigDecimal.ZERO)>0) {
 								BigDecimal base = getQtyUsed();
 								base = base.multiply(multiplyrate).setScale(2, RoundingMode.HALF_UP);
-								setMovementQty(base);
+								setMovementQty(base.negate());
 							}
 						}
-					}
+					}*/
 					setIsEndProduct(false);
 				}
 			}
@@ -578,12 +578,12 @@ public class FTUMProductionLine extends MProductionLine{
 					String sql = "SELECT DivideRate FROM C_UOM_Conversion WHERE M_Product_ID="+prod.getM_Product_ID()+" AND C_UOM_ID="+prod.getC_UOM_ID()+" AND C_UOM_To_ID="+C_UOM_ID;
 					BigDecimal multiplyrate = DB.getSQLValueBD(get_TrxName(), sql);
 					if(multiplyrate.compareTo(BigDecimal.ZERO)>0) {
-						BigDecimal base = getPlannedQty();
+						BigDecimal base = getQtyUsed();
 						base = base.multiply(multiplyrate).setScale(2, RoundingMode.HALF_UP);
-						setMovementQty(base);
+						setMovementQty(base.negate());
 					}
 				}else
-					setMovementQty(getPlannedQty().negate());
+					setMovementQty(getQtyUsed().negate());
 			}else
 				setMovementQty(getPlannedQty().negate());
 		}else if(isEndProduct() && isTransformation){

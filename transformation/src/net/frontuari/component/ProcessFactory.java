@@ -20,6 +20,7 @@ package net.frontuari.component;
 
 import net.frontuari.base.CustomProcessFactory;
 import net.frontuari.process.ProductionCreate;
+import net.frontuari.process.ProductionPreview;
 import net.frontuari.process.TransformationCreate;
 
 /**
@@ -40,6 +41,7 @@ public class ProcessFactory extends CustomProcessFactory {
 	protected void initialize() {
 		 registerProcess(ProductionCreate.class);
 		 registerProcess(TransformationCreate.class);
+		 registerProcess(ProductionPreview.class);
 	}
 
 }
