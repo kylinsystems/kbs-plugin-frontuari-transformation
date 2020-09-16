@@ -203,7 +203,8 @@ public class Doc_Transformation extends Doc_Production{
 				isTransformation = true ;
 				parentCosts = parentLine.getProductCosts(as, parentLine.getAD_Org_ID(), false).setScale(curr.getCostingPrecision(),RoundingMode.HALF_UP);
 				X_M_ProductionLine prodLine = (X_M_ProductionLine)parentLine.getPO();
-				unitParentCosts = parentCosts.divide(prodLine.getMovementQty(),RoundingMode.HALF_UP);
+				BigDecimal MovementQty = prodLine.getMovementQty();
+				unitParentCosts = parentCosts.divide(MovementQty,RoundingMode.HALF_UP);
 			}
 		
 		for (int i = 0; i < p_lines.length; i++){
@@ -217,8 +218,8 @@ public class Doc_Transformation extends Doc_Production{
 				if (cd != null) {
 					
 					costs = cd.getAmt();
-					
-					/*X_M_ProductionLine prodLine = (X_M_ProductionLine)line.getPO();
+					/*
+					X_M_ProductionLine prodLine = (X_M_ProductionLine)line.getPO();
 					BigDecimal qtyUsed = prodLine.getQtyUsed();
 					
 					if(qtyUsed.signum()==0){

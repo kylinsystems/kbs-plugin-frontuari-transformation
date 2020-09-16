@@ -19,6 +19,8 @@
 package net.frontuari.component;
 
 import net.frontuari.base.CustomCalloutFactory;
+import net.frontuari.callout.FTUProductionCallout;
+import net.frontuari.model.FTUMProduction;
 
 /**
  * Callout Factory
@@ -36,6 +38,7 @@ public class CalloutFactory extends CustomCalloutFactory {
 	 */
 	@Override
 	protected void initialize() {
+		registerCallout(FTUMProduction.Table_Name, FTUMProduction.COLUMNNAME_M_Product_ID, FTUProductionCallout.class);
 	}
 
 }

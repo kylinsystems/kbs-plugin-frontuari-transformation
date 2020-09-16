@@ -98,20 +98,21 @@ public class ProductionPreview extends CustomProcess {
 			if (p_CreateProduction)
 				createProduction();
 			
-			String sql = "SELECT * FROM ftu_rv_productionpreview";
+			String sql = "SELECT pp.*,ov.logo_id FROM ftu_v_productionpreviewsource pp"
+					+ " JOIN ad_org_v ov ON pp.ad_org_id = ov.ad_org_id";
 			
-			String whereClause = " WHERE M_Product_ID="+p_M_Product_ID +" AND AD_Client_ID="+getAD_Client_ID();
+			String whereClause = " WHERE pp.M_Product_ID="+p_M_Product_ID +" AND pp.AD_Client_ID="+getAD_Client_ID();
 			
 			if(p_PP_Product_BOM_ID>0)
-				whereClause += " AND PP_Product_BOM_ID="+p_PP_Product_BOM_ID;
+				whereClause += " AND pp.PP_Product_BOM_ID="+p_PP_Product_BOM_ID;
 			if(p_TrxType.length()>0)
-				whereClause += " AND productionmethod='"+p_TrxType+"'";
+				whereClause += " AND pp.productionmethod='"+p_TrxType+"'";
 			if(p_M_Locator_ID>0)
-				whereClause += " AND M_Locator_ID="+p_M_Locator_ID;
+				whereClause += " AND pp.M_Locator_ID="+p_M_Locator_ID;
 			if(p_M_Warehouse_ID>0)
-				whereClause += " AND M_Warehouse_ID="+p_M_Warehouse_ID;
+				whereClause += " AND pp.M_Warehouse_ID="+p_M_Warehouse_ID;
 			if(p_AD_Org_ID>0)
-				whereClause += " AND AD_Org_ID="+p_AD_Org_ID;
+				whereClause += " AND pp.AD_Org_ID="+p_AD_Org_ID;
 			
 			sql += whereClause;
 			
@@ -160,8 +161,10 @@ public class ProductionPreview extends CustomProcess {
 					String product_bom_name = rs.getString("Product_BOM_Name");
 					String product_bom_sku = rs.getString("Product_BOM_sku");
 					String Product_BOM_Value = rs.getString("Product_BOM_Value");
+					int Logo_ID = rs.getInt("Logo_ID");
 					
 					X_FTU_R_ProductionPreview pp = new X_FTU_R_ProductionPreview (getCtx(),0,get_TrxName());
+					pp.set_ValueOfColumn("Logo_ID", Logo_ID);
 					pp.setM_Product_ID(M_Product_ID);
 					pp.setproduct_value(product_value);
 					pp.setSKU(sku);
@@ -174,20 +177,29 @@ public class ProductionPreview extends CustomProcess {
 					pp.setDocumentNo(DocumentNo);
 					pp.setPP_Product_BOM_ID(PP_Product_BOM_ID);
 					pp.setM_ProductBOM_ID(M_ProductBOM_ID);
-					
+					pp.set_ValueOfColumn("ProductionQty", p_ProductionQty);
+					if(bom_uom_id!=bom_uombase_id && DivideRate!=null && DivideRate.compareTo(BigDecimal.ZERO)>0) {
+						QtyUsed=QtyUsed.multiply(DivideRate).setScale(4, RoundingMode.HALF_UP);
+						MovementQty=MovementQty.multiply(DivideRate).setScale(4, RoundingMode.HALF_UP);
+					}					
 					QtyUsed = QtyUsed.multiply(p_ProductionQty).setScale(4, RoundingMode.HALF_UP);
 					pp.setQtyUsed(QtyUsed);
 					MovementQty = MovementQty.multiply(p_ProductionQty).setScale(4, RoundingMode.HALF_UP);
 					pp.setMovementQty(MovementQty);
-					pp.setScrap(Scrap);
-					pp.setScrappedQty(QtyUsed.subtract(MovementQty));
-					pp.setPriceActual(PriceActual);
-					pp.setLineTotalAmt(PriceActual.multiply(p_ProductionQty).setScale(4, RoundingMode.HALF_UP));
-					totalAmt = totalAmt.add(PriceActual.multiply(p_ProductionQty).setScale(4, RoundingMode.HALF_UP));
+
 					
-					if(p_TrxType.equalsIgnoreCase("T")) {
+					
+					pp.setScrap(Scrap);
+					
+					if(p_TrxType.equalsIgnoreCase("T") && Scrap!=null && Scrap.compareTo(BigDecimal.ZERO)!=0) {
 						priceActual = PriceActual;
 					}
+					
+					
+					pp.setScrappedQty(QtyUsed.subtract(MovementQty));
+					pp.setPriceActual(PriceActual);
+					pp.setLineTotalAmt(PriceActual.multiply(QtyUsed).setScale(4, RoundingMode.HALF_UP));
+					totalAmt = totalAmt.add(PriceActual.multiply(QtyUsed).setScale(4, RoundingMode.HALF_UP));
 					
 					pp.setQtyOnHand(QtyOnHand);
 					pp.setQtyOrdered(QtyOrdered);

@@ -32,6 +32,7 @@ public class ProductionCreate extends CustomProcess {
 	private boolean recreate = false;
 	private BigDecimal newQty = null;
 	private int PP_Product_BOM_ID =0 ;
+	private String TrxType;
 	//private int p_M_Locator_ID=0;
 	
 	
@@ -54,6 +55,7 @@ public class ProductionCreate extends CustomProcess {
 		
 		p_M_Production_ID = getRecord_ID();
 		m_production = new FTUMProduction(getCtx(), p_M_Production_ID, get_TrxName());
+		TrxType = m_production.get_ValueAsString("TrxType");
 
 	}	//prepare
 
@@ -103,6 +105,39 @@ public class ProductionCreate extends CustomProcess {
 		
 		return false;
 	}
+	
+	private boolean costsOK(int M_Product_ID) throws AdempiereUserError {
+		// Warning will not work if non-standard costing is used
+		String sql = "SELECT ABS(((cc.currentcostprice-(SELECT SUM(c.currentcostprice*bom.bomqty)"
+            + " FROM m_cost c"
+            + " INNER JOIN m_product_bom bom ON (c.m_product_id=bom.m_productbom_id)"
+	            + " INNER JOIN m_costelement ce ON (c.m_costelement_id = ce.m_costelement_id AND ce.costingmethod = 'S')"
+            + " WHERE bom.m_product_id = pp.m_product_id)"
+            + " )/cc.currentcostprice))"
+            + " FROM m_product pp"
+            + " INNER JOIN m_cost cc on (cc.m_product_id=pp.m_product_id)"
+            + " INNER JOIN m_costelement ce ON (cc.m_costelement_id=ce.m_costelement_id)"
+            + " WHERE cc.currentcostprice > 0 AND pp.M_Product_ID = ?"
+            + " AND ce.costingmethod='S'";
+		
+		BigDecimal costPercentageDiff = DB.getSQLValueBD(get_TrxName(), sql, M_Product_ID);
+		
+		if (costPercentageDiff == null)
+		{
+			costPercentageDiff = Env.ZERO;
+			String msg = "Could not retrieve costs";
+			if (MSysConfig.getBooleanValue(MSysConfig.MFG_ValidateCostsOnCreate, false, getAD_Client_ID())) {
+				throw new AdempiereUserError(msg);
+			} else {
+				log.warning(msg);
+			}
+		}
+		
+		if ( (costPercentageDiff.compareTo(new BigDecimal("0.005")))< 0 )
+			return true;
+		
+		return false;
+	}
 
 	protected String createLines() throws Exception {
 		
@@ -117,7 +152,11 @@ public class ProductionCreate extends CustomProcess {
 				m_production.setProductionQty(newQty);
 			
 			m_production.deleteLines(get_TrxName());
-			created = m_production.createProductionLines(mustBeStocked,PP_Product_BOM_ID);
+			if(TrxType.equalsIgnoreCase("P")) {
+				created = m_production.createProductionLines(mustBeStocked,PP_Product_BOM_ID);
+			}else if(TrxType.equalsIgnoreCase("T")) {
+				created = m_production.createTransformationLines(mustBeStocked);
+			}
 		} else {
 			Query planQuery = new Query(getCtx(), I_M_ProductionPlan.Table_Name, "M_ProductionPlan.M_Production_ID=?", get_TrxName());
 			List<MProductionPlan> plans = planQuery.setParameters(m_production.getM_Production_ID()).list();
@@ -147,12 +186,24 @@ public class ProductionCreate extends CustomProcess {
 	private void validateEndProduct(int M_Product_ID) throws Exception {
 		isBom(M_Product_ID);
 		
-		if (!costsOK(M_Product_ID,PP_Product_BOM_ID)) {
-			String msg = "Excessive difference in standard costs";
-			if (MSysConfig.getBooleanValue(MSysConfig.MFG_ValidateCostsDifferenceOnCreate, false, getAD_Client_ID())) {
-				throw new AdempiereUserError("Excessive difference in standard costs");
-			} else {
-				log.warning(msg);
+		if(TrxType.equalsIgnoreCase("P")) {
+			if (!costsOK(M_Product_ID,PP_Product_BOM_ID)) {
+				String msg = "Excessive difference in standard costs";
+				if (MSysConfig.getBooleanValue(MSysConfig.MFG_ValidateCostsDifferenceOnCreate, false, getAD_Client_ID())) {
+					throw new AdempiereUserError("Excessive difference in standard costs");
+				} else {
+					log.warning(msg);
+				}
+			}
+		}
+		else if(TrxType.equalsIgnoreCase("T")) {
+			if (!costsOK(M_Product_ID)) {
+				String msg = "Excessive difference in standard costs";
+				if (MSysConfig.getBooleanValue(MSysConfig.MFG_ValidateCostsDifferenceOnCreate, false, getAD_Client_ID())) {
+					throw new AdempiereUserError("Excessive difference in standard costs");
+				} else {
+					log.warning(msg);
+				}
 			}
 		}
 	}
@@ -164,7 +215,14 @@ public class ProductionCreate extends CustomProcess {
 		{
 			throw new AdempiereUserError ("Attempt to create product line for Non Bill Of Materials");
 		}
-		int materials = DB.getSQLValue(get_TrxName(), "SELECT count(PP_Product_BOMLine_ID) FROM PP_Product_BOMLine WHERE PP_Product_BOM_ID = ?", PP_Product_BOM_ID);
+		String sql = "";
+		if(TrxType.equalsIgnoreCase("P")) {
+			sql = "SELECT count(PP_Product_BOMLine_ID) FROM PP_Product_BOMLine WHERE PP_Product_BOM_ID ="+ PP_Product_BOM_ID;
+		}else if(TrxType.equalsIgnoreCase("T")) {
+			sql = "SELECT count(M_Product_BOM_ID) FROM M_Product_BOM WHERE M_Product_ID ="+ M_Product_ID;			
+		}
+		
+		int materials = DB.getSQLValue(get_TrxName(), sql);
 		if (materials == 0)
 		{
 			throw new AdempiereUserError ("Attempt to create product line for Bill Of Materials with no BOM Products");

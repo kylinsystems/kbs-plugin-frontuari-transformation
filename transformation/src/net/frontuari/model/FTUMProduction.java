@@ -43,6 +43,8 @@ import org.compiere.model.MProjectLine;
 import org.compiere.model.MSequence;
 import org.compiere.model.MStorageOnHand;
 import org.compiere.model.MSysConfig;
+import org.compiere.model.MUOM;
+import org.compiere.model.MUOMConversion;
 import org.compiere.model.MWarehouse;
 import org.compiere.model.ModelValidationEngine;
 import org.compiere.model.ModelValidator;
@@ -63,6 +65,8 @@ public class FTUMProduction extends MProduction implements DocAction {
 	public String		m_processMsg = null;
 	/**	Just Prepared Flag			*/
 	public boolean		m_justPrepared = false;
+	
+	private static final String ProductionQuantity = "PQ";
 	
 
 	/**
@@ -141,7 +145,7 @@ public class FTUMProduction extends MProduction implements DocAction {
 		int processed = 0;
 		
 		if (!isUseProductionPlan()) {
-			MProductionLine[] lines = getLines();
+			FTUMProductionLine[] lines = getLines();
 			//IDEMPIERE-3107 Check if End Product in Production Lines exist
 			if(!isHaveEndProduct(lines)) {
 				m_processMsg = "Production does not contain End Product";
@@ -180,7 +184,7 @@ public class FTUMProduction extends MProduction implements DocAction {
 		
 		
 		if(get_ValueAsString("TrxType").equalsIgnoreCase("T")){
-			BigDecimal diference = verifyTransformationQty(getLines());
+			/*BigDecimal diference = verifyTransformationQty(getLines());
 			if(diference.signum()!=0){
 				m_processMsg = "Las Cantidades a usadas no coinciden con las cantidades a transformar por :"+diference;
 				return DocAction.STATUS_Invalid;
@@ -223,12 +227,7 @@ public class FTUMProduction extends MProduction implements DocAction {
 			m_processMsg = valid;
 			return DocAction.STATUS_Invalid;
 		}
-		if(get_ValueAsBoolean("IsTransformation")){
-			/*if(!updateProductPrices(getLines())){
-				m_processMsg = "No se pudieron actualizar los precios de los productos hijos";
-				return DocAction.STATUS_Invalid;
-			}*/
-		}
+	
 		setProcessed(true);
 		setDocAction(DOCACTION_Close);
 		return DocAction.STATUS_Completed;
@@ -251,7 +250,7 @@ public class FTUMProduction extends MProduction implements DocAction {
 		for ( int i = 0; i<lines.length; i++) {
 			FTUMProductionLine line = new FTUMProductionLine(getCtx(), lines[i].getM_ProductionLine_ID(), get_TrxName());
 			MWarehouse wh = (MWarehouse) line.getM_Locator().getM_Warehouse();
-			String error = line.createTransactions(getMovementDate(), wh.isDisallowNegativeInv());
+			String error = line.createTransactions(getMovementDate(), true);//wh.isDisallowNegativeInv()
 			if (!Util.isEmpty(error)) {
 				errors.append(error);
 			} else { 
@@ -510,23 +509,34 @@ public int createLines(boolean mustBeStocked) {
 
 		int C_UOM_ID = get_ValueAsInt("C_UOM_ID");
 		
+		BigDecimal ProductionQty = getProductionQty();
+		
+		
 		// product to be produced
 		MProduct finishedProduct = new MProduct(getCtx(), getM_Product_ID(), get_TrxName());
+		
+		if(finishedProduct.getC_UOM_ID()!=C_UOM_ID) {
+			ProductionQty = MUOMConversion.convertProductTo(getCtx(), finishedProduct.get_ID(), C_UOM_ID, ProductionQty);
+			if(ProductionQty.signum()==0)
+				throw new AdempiereException("El producto "+finishedProduct.getValue()+"-"+finishedProduct.getName()+" no tiene conversion de unidades de medida");
+		}
 		
 
 		FTUMProductionLine line = new FTUMProductionLine( this );
 		line.setLine( lineno );
 		line.setM_Product_ID( finishedProduct.get_ID() );
 		line.setM_Locator_ID( getM_Locator_ID() );
-		line.setMovementQty( getProductionQty());
-		line.setPlannedQty(getProductionQty());
+		line.setMovementQty(ProductionQty);
+		line.setPlannedQty(ProductionQty);
 		if(C_UOM_ID>0)
 			line.set_ValueOfColumn("C_UOM_ID", C_UOM_ID);
+		
+		
 		
 		line.saveEx(get_TrxName());
 		count++;
 		
-		createProductionLines(mustBeStocked, finishedProduct, PP_Product_BOM_ID, getProductionQty());
+		createProductionLines(mustBeStocked, finishedProduct, PP_Product_BOM_ID, ProductionQty);
 		
 		return count;
 	}
@@ -746,6 +756,7 @@ public int createLines(boolean mustBeStocked) {
 
 		// product to be produced
 		MProduct finishedProduct = new MProduct(getCtx(), getM_Product_ID(), get_TrxName());
+				
 		
 		BigDecimal MovementQty = getProductionQty();
 		
@@ -754,7 +765,18 @@ public int createLines(boolean mustBeStocked) {
 		MLocator finishedLocator = MLocator.get(getCtx(), getM_Locator_ID());
 
 		int C_UOM_ID = get_ValueAsInt("C_UOM_ID");
-						
+		
+		BigDecimal ConversionRate = BigDecimal.ZERO;
+		
+		if(finishedProduct.getC_UOM_ID()!=C_UOM_ID) {
+			MovementQty = MUOMConversion.convertProductFrom(getCtx(), finishedProduct.get_ID(), C_UOM_ID, MovementQty);
+			ConversionRate = MUOMConversion.getProductRateFrom(getCtx(), finishedProduct.get_ID(), C_UOM_ID);
+			if(MovementQty.signum()==0 || ConversionRate==null)
+				throw new AdempiereException("El producto "+finishedProduct.getValue()+"-"+finishedProduct.getName()+" no tiene conversion de unidades de medida");
+		}
+				
+		BigDecimal ProductionQty = MovementQty;
+		
 		int M_Warehouse_ID = finishedLocator.getM_Warehouse_ID();
 		
 		int asi = 0;
@@ -802,7 +824,7 @@ public int createLines(boolean mustBeStocked) {
 					Line.setLine(lineno);
 					Line.setM_Product_ID(finishedProduct.get_ID());
 					Line.setM_Locator_ID(loc);
-					Line.setQtyUsed(lineQty);
+					Line.setQtyUsed(ConversionRate.compareTo(BigDecimal.ZERO)>0?lineQty.divide(ConversionRate,6, RoundingMode.HALF_UP):lineQty);
 					Line.setPlannedQty(lineQty);
 					Line.setMovementQty(lineQty.negate());
 					Line.setIsEndProduct(false);
@@ -828,7 +850,7 @@ public int createLines(boolean mustBeStocked) {
 		count ++;
 		
 		
-		createTransformationLines(mustBeStocked, finishedProduct, getProductionQty());
+		createTransformationLines(mustBeStocked, finishedProduct, ProductionQty);
 	
 		
 		return count;
@@ -848,7 +870,7 @@ public int createLines(boolean mustBeStocked) {
 		//int asi = 0;
 
 		// products used in production
-		String sql = " SELECT M_ProductBom_ID, BOMQty, Scrap, C_UOM_ID,IsQtyPercentage FROM M_Product_BOM "
+		String sql = " SELECT M_ProductBom_ID, BOMQty, COALESCE(Scrap,0) as Scrap, C_UOM_ID,IsQtyPercentage FROM M_Product_BOM "
 				+ " WHERE M_Product_ID=" + finishedProduct.getM_Product_ID() + " AND isactive='Y' AND (AD_Org_ID = 0 OR AD_Org_ID = " + getAD_Org_ID() + ") "
 				+ " ORDER BY Line";
 
@@ -969,6 +991,41 @@ public int createLines(boolean mustBeStocked) {
 		setDocAction(DOCACTION_Prepare);
 		return true;
 	}
+	
+	
+	public void ValidateProduction (MProduct prod) {
+		String ProductionValidationMethod = prod.get_ValueAsString("ProductionValidationMethod");
+		
+		if(ProductionValidationMethod==null || ProductionValidationMethod.equalsIgnoreCase("")) {
+			//none
+		}		
+		else if(ProductionValidationMethod.equalsIgnoreCase(ProductionQuantity)) {			
+			ValidateProductionQuantity();
+		}
+		
+		
+		
+	}
+	
+	public void ValidateProductionQuantity () {
+		String sql = "SELECT count(p.C_UOM_ID) FROM (SELECT prod.C_UOM_ID FROM M_ProductionLine pl"
+				+ " JOIN M_Product prod ON prod.M_Product_ID=pl.M_Product_ID"
+				+ " WHERE pl.M_Production_ID = "+getM_Production_ID()+" GROUP BY prod.C_UOM_ID) AS p";
+		int uomqty = DB.getSQLValueEx(get_TrxName(), sql); 
+		if (uomqty>1)
+			throw new AdempiereException("Las unidades base de los productos son diferentes");
+		
+		sql = " SELECT sum(pl.qtyused) FROM M_ProductionLine pl WHERE M_Production_ID="+getM_Production_ID()+" AND M_Product_ID<>"+getM_Product_ID();
+		BigDecimal ProductionQty = getProductionQty();
+		BigDecimal LinesQty = DB.getSQLValueBDEx(get_TrxName(), sql);
+		ProductionQty = ProductionQty.subtract(LinesQty).setScale(MUOM.getPrecision(getCtx(), get_ValueAsInt("C_UOM_ID")), RoundingMode.HALF_UP);
+		if(ProductionQty.signum()>0)
+			throw new AdempiereException("Las cantidades usadas en las lineas no corresponden a las unidades a procesar, faltan: "+ProductionQty.toString());
+		else if(ProductionQty.signum()<0)
+			throw new AdempiereException("Las cantidades usadas en las lineas no corresponden a las unidades a procesar, sobran: "+ProductionQty.negate().toString());
+		
+	}
+	
 
 	
 	@Override
@@ -980,12 +1037,13 @@ public int createLines(boolean mustBeStocked) {
 		log.warning("transformation");
 		//	Std Period open?
 		MPeriod.testPeriodOpen(getCtx(), getMovementDate(), MDocType.DOCBASETYPE_MaterialProduction, getAD_Org_ID());
-
+		
+		boolean isTransformation = get_ValueAsString("TrxType").equalsIgnoreCase("T");
+		
 		if ( getIsCreated().equals("N") )
 		{
-			/*
 			//m_processMsg = "Not created";
-			if(get_ValueAsBoolean("IsTransformation")){
+			if(isTransformation){
 				
 			m_processMsg = "Debe crear las lineas o actualizarlas(Recrearlas) en caso de haber cambiado la cantidad a transformar";
 			return DocAction.STATUS_Invalid; 
@@ -994,16 +1052,19 @@ public int createLines(boolean mustBeStocked) {
 			return DocAction.STATUS_Invalid; 
 			}
 		}
-		if(get_ValueAsBoolean("IsTransformation")){
-			String sql = "SELECT COALESCE(SUM(QtyAvailable),0) FROM FTU_RV_Storage_Available_Product  WHERE M_Product_ID = "+getM_Product_ID()+" AND AD_Org_ID = "+getAD_Org_ID()+" AND M_Locator_ID="+getM_Locator_ID();
+		if(isTransformation){
+			//FTU_RV_Storage_Available_Product
+			String sql = "SELECT COALESCE(SUM(QtyOnHand-QtyReserved),0) FROM M_Storage  WHERE M_Product_ID = "+getM_Product_ID()+" AND AD_Org_ID = "+getAD_Org_ID()+" AND M_Locator_ID="+getM_Locator_ID();
 			BigDecimal qty = DB.getSQLValueBD(get_TrxName(), sql);
 			if(qty!=null){
 				if(qty.compareTo(getProductionQty())<0){
 					m_processMsg = "La cantidad a transformar es menor a la cantidad disponible en el almacen y la ubicacion seleccionada";
 					return DocAction.STATUS_Invalid; 
 				}
-			}*/
+			}
 		}
+		
+		ValidateProduction((MProduct)getM_Product());
 		
 		if (!isUseProductionPlan()) {
 			m_processMsg = validateEndProduct(getM_Product_ID());			
@@ -1033,7 +1094,7 @@ public int createLines(boolean mustBeStocked) {
 	
 	@Override
 	protected String validateEndProduct(int M_Product_ID) {
-		String msg = isBom(M_Product_ID);
+		String msg = "";//isBom(M_Product_ID);
 		if (!Util.isEmpty(msg))
 			return msg;
 
@@ -1051,16 +1112,18 @@ public int createLines(boolean mustBeStocked) {
 
 	@Override
 	protected String isBom(int M_Product_ID) {
-		String bom = DB.getSQLValueString(get_TrxName(), "SELECT isbom FROM M_Product WHERE M_Product_ID = ?", M_Product_ID);
+		String bom = DB.getSQLValueString(get_TrxName(), "SELECT isbom FROM M_Product WHERE M_Product_ID ="+ M_Product_ID);
 		if ("N".compareTo(bom) == 0) {
-			return "Attempt to create product line for Non Bill Of Materials";
+			return "Attempt to create product line for Non Bill Of Materials1";
 		}
 		int materials = 0;
+		String sql = "";
 		if(get_ValueAsString("TrxType").equalsIgnoreCase("T"))
-			materials = DB.getSQLValue(get_TrxName(), "SELECT count(M_Product_BOM_ID) FROM M_Product_BOM WHERE M_Product_ID = ? AND (AD_Org_ID = 0 OR AD_Org_ID =?)", M_Product_ID, getAD_Org_ID());
+			sql = "SELECT count(M_Product_BOM_ID) FROM M_Product_BOM WHERE M_Product_ID = "+M_Product_ID+" AND (AD_Org_ID = 0 OR AD_Org_ID ="+ getAD_Org_ID()+")";
 		else if(get_ValueAsString("TrxType").equalsIgnoreCase("P"))
-			materials = DB.getSQLValue(get_TrxName(), "SELECT count(PP_Product_BOMLine_ID) FROM PP_Product_BOMLine WHERE PP_Product_BOM_ID = ? AND (AD_Org_ID = 0 OR AD_Org_ID =?)", get_ValueAsInt("PP_Product_BOM_ID"), getAD_Org_ID());
+			sql = "SELECT count(PP_Product_BOMLine_ID) FROM PP_Product_BOMLine WHERE PP_Product_BOM_ID = "+ get_ValueAsInt("PP_Product_BOM_ID");
 		
+		materials = DB.getSQLValue(get_TrxName(),sql);
 		if (materials == 0)
 		{
 			return "Attempt to create product line for Bill Of Materials with no BOM Products";
@@ -1438,8 +1501,16 @@ public int createLines(boolean mustBeStocked) {
 			}
 		}
 		
-		if(is_ValueChanged(COLUMNNAME_ProductionQty)||is_ValueChanged(COLUMNNAME_M_Product_ID)||is_ValueChanged(COLUMNNAME_M_Locator_ID)) {
+		if(is_ValueChanged(COLUMNNAME_ProductionQty)||is_ValueChanged(COLUMNNAME_M_Product_ID)/*||is_ValueChanged(COLUMNNAME_M_Locator_ID)*/) {
 			setIsCreated("N");
+		}
+		if(is_ValueChanged(COLUMNNAME_M_Product_ID)) {
+			
+			String sql = "SELECT pc.User1_ID FROM FTU_ProductCostCenter pc JOIN M_Product p ON p.Classification = pc.Classification ";
+			int User1_ID = DB.getSQLValue(get_TrxName(), sql);
+			if(User1_ID > 0)
+				setUser1_ID(User1_ID);
+			
 		}
 			
 		
@@ -1449,7 +1520,10 @@ public int createLines(boolean mustBeStocked) {
 	protected BigDecimal verifyTransformationQty(MProductionLine[] lines){
 		
 		BigDecimal usedQty = new BigDecimal(0);
+				
 		BigDecimal requiredQty = getProductionQty();
+		
+		
 		
 		for(MProductionLine line : lines){
 			
@@ -1464,158 +1538,6 @@ public int createLines(boolean mustBeStocked) {
 		}
 		
 		return BigDecimal.ZERO;
-	}
-
-	
-protected boolean updateProductPrices(FTUMProductionLine[] lines){
-		
-		/*String sql = "SELECT MAX(C_DocType_ID) FROM C_DocType WHERE DocBaseType = 'PCH'";
-		
-		int docTypeId = DB.getSQLValue(get_TrxName(), sql);
-		
-		for(FTUMProductionLine line : lines){
-			if(line.isEndProduct() && line.getQtyUsed().compareTo(BigDecimal.ZERO)> 0){
-				
-				MProduct prod = new MProduct(getCtx(),line.getM_Product_ID(),get_TrxName());
-				MBSCAPriceChange pc = new MBSCAPriceChange(getCtx(),0,get_TrxName());
-				pc.setAD_Org_ID(getAD_Org_ID());
-				pc.setAD_OrgTrx_ID(getAD_Org_ID());
-				pc.setC_DocTypeTarget_ID(docTypeId);
-				pc.setC_DocType_ID(0);
-				pc.setDateAcct(new Timestamp(System.currentTimeMillis()));
-				
-				sql = "SELECT MAX(BSCA_ProductValue_ID) FROM BSCA_ProductValue WHERE Value='"+prod.getSKU()+"'";
-				int BSCA_ProductValue_ID = DB.getSQLValue(get_TrxName(), sql);
-				pc.setBSCA_ProductValue_ID(BSCA_ProductValue_ID);
-				pc.setM_Product_ID(prod.get_ID());
-				pc.setUser1W_ID(prod.get_ValueAsInt("User1W_ID"));
-				pc.setUser1X_ID(prod.get_ValueAsInt("User1X_ID"));
-				pc.setUser1Y_ID(prod.get_ValueAsInt("User1Y_ID"));
-				pc.setUser1Z_ID(prod.get_ValueAsInt("User1Z_ID"));
-				pc.setUser1_ID(prod.get_ValueAsInt("User1_ID"));
-				
-				BigDecimal amount = (BigDecimal)line.get_Value("PriceLastInv");
-				
-				pc.setPriceLastProduction(amount);
-				pc.setPriceActual(amount);
-				pc.setPriceListOld(BigDecimal.ONE);
-				pc.setPriceStdOld(BigDecimal.ONE);
-				pc.setPriceLimitOld(BigDecimal.ONE);
-				pc.setPriceLastInv(BigDecimal.ZERO);
-				pc.set_ValueOfColumn("BaseLimitPrice", amount); //from lastest version
-				pc.set_ValueOfColumn("BaseListPrice", amount); //from lastest version
-				pc.set_ValueOfColumn("BaseStdPrice", amount); //from lastest version
-				
-				
-				pc.setM_Production_ID(get_ID());
-				
-				sql = "SELECT sl.BSCA_List_Discount FROM M_DiscountSchema  s "
-						+ " INNER JOIN M_DiscountSchemaLine sl ON sl.m_discountschema_id = s.m_discountschema_id "
-						+ " WHERE s.ad_client_id="+getAD_Client_ID()+" AND s.ad_org_id ="+getAD_Org_ID()+"  AND sl.m_product_id ="+prod.get_ID()+" AND s.isactive = 'Y' AND sl.isactive = 'Y'";
-				
-				BigDecimal percent = DB.getSQLValueBD(get_TrxName(), sql);
-				if(percent==null){
-					throw new AdempiereException("El porcentaje de no esta definido en el esquema de descuento para el producto:"+prod.getName()+", Cod:"+prod.getSKU()); 
-				}
-				if(percent.compareTo(BigDecimal.ZERO)> 0){
-					pc.setPercentageProfitPLimit(percent);
-					pc.setPercentageProfitPList(percent);
-					pc.setPercentageProfitPStd(percent);
-					percent = percent.divide(new BigDecimal(100));
-					BigDecimal profit = amount.multiply(percent).setScale(2, RoundingMode.HALF_UP);
-					pc.setBSCA_ProfitPriceLimit(profit);
-					pc.setBSCA_ProfitPriceList(profit);
-					pc.setBSCA_ProfitPriceStd(profit);
-					pc.setBSCA_ProfitPriceLimitEntered(profit);
-					pc.setBSCA_ProfitPriceListEntered(profit);
-					pc.setBSCA_ProfitPriceStdEntered(profit);
-					amount = amount.add(profit);
-				}else{
-					pc.setPercentageProfitPLimit(BigDecimal.ZERO);
-					pc.setPercentageProfitPList(BigDecimal.ZERO);
-					pc.setPercentageProfitPStd(BigDecimal.ZERO);
-					pc.setBSCA_ProfitPriceLimit(BigDecimal.ZERO);
-					pc.setBSCA_ProfitPriceList(BigDecimal.ZERO);
-					pc.setBSCA_ProfitPriceStd(BigDecimal.ZERO);
-					pc.setBSCA_ProfitPriceLimitEntered(BigDecimal.ZERO);
-					pc.setBSCA_ProfitPriceListEntered(BigDecimal.ZERO);
-					pc.setBSCA_ProfitPriceStdEntered(BigDecimal.ZERO);
-				}
-				
-				pc.setPriceListEntered(amount);
-				pc.setPriceLimitEntered(amount);
-				pc.setPriceStdEntered(amount);
-				pc.setPriceList(amount);
-				pc.setPriceLimit(amount);
-				pc.setPriceStd(amount);
-				pc.setIsSetPriceList(true);
-				
-				sql = "select t.rate from C_Tax t "
-						+ "inner join c_taxcategory tc on tc.c_taxcategory_id = t.c_taxcategory_id "
-						+ "inner join M_Product p on p.c_taxcategory_id = tc.c_taxcategory_id"
-						+ " where p.m_product_id = "+prod.get_ID()+" and t.issummary = 'N' and t.isactive = 'Y' and t.isdefault = 'Y' order by t.validfrom desc";
-				
-				percent = DB.getSQLValueBD(get_TrxName(), sql);
-				
-				
-				if(percent.compareTo(BigDecimal.ZERO)> 0){
-					percent = percent.divide(new BigDecimal(100));
-					BigDecimal profit = amount.multiply(percent).setScale(2, RoundingMode.HALF_UP);
-					pc.setTaxAmtPriceLimit(profit);
-					pc.setTaxAmtPriceList(profit);
-					pc.setTaxAmtPriceStd(profit);
-					
-					amount = amount.add(profit);
-				}else{
-					pc.setTaxAmtPriceLimit(BigDecimal.ZERO);
-					pc.setTaxAmtPriceList(BigDecimal.ZERO);
-					pc.setTaxAmtPriceStd(BigDecimal.ZERO);
-				}
-				
-				pc.setPriceListWTax(amount);
-				pc.setPriceLimitWTax(amount);
-				pc.setPriceStdWTax(amount);
-				
-				pc.setDocStatus(pc.prepareIt());//MBSCAPriceChange.DOCSTATUS_Drafted);
-				
-				pc.saveEx(get_TrxName());
-				
-				System.out.println(pc.get_ID()+"-"+pc.getDocumentNo());
-			
-				
-			}
-			/*if(line.isEndProduct() && line.getQtyUsed().compareTo(BigDecimal.ZERO)> 0){
-				MProduct prod = new MProduct(getCtx(),line.getM_Product_ID(),get_TrxName());
-				MBSCAPriceChange pc = new MBSCAPriceChange(getCtx(),0,get_TrxName());
-				pc.setAD_Org_ID(getAD_Org_ID());
-				pc.setAD_OrgTrx_ID(getAD_Org_ID());
-				pc.setC_DocTypeTarget_ID(docTypeId);
-				pc.setC_DocType_ID(0);
-				
-				sql = "SELECT MAX(BSCA_ProductValue_ID) FROM BSCA_ProductValue WHERE Value='"+prod.getSKU()+"'";
-				int BSCA_ProductValue_ID = DB.getSQLValue(get_TrxName(), sql);
-				pc.setBSCA_ProductValue_ID(BSCA_ProductValue_ID);
-				pc.setM_Product_ID(prod.get_ID());
-				pc.setUser1W_ID(prod.get_ValueAsInt("User1W_ID"));
-				pc.setUser1X_ID(prod.get_ValueAsInt("User1X_ID"));
-				pc.setUser1Y_ID(prod.get_ValueAsInt("User1Y_ID"));
-				pc.setUser1Z_ID(prod.get_ValueAsInt("User1Z_ID"));
-				pc.setUser1_ID(prod.get_ValueAsInt("User1_ID"));
-				
-				BigDecimal amount = (BigDecimal)line.get_Value("PriceLastInv");
-				pc.setPriceListEntered(amount);
-				pc.setPriceLimitEntered(amount);
-				pc.setPriceStdEntered(amount);
-				pc.setIsSetPriceList(true);
-				pc.setDocStatus(MBSCAPriceChange.DOCSTATUS_Drafted);
-				pc.saveEx(get_TrxName());
-				
-				System.out.println(pc.get_ID()+"-"+pc.getDocumentNo());
-			}		
-			
-		}*/
-		
-		return true;
 	}
 	
 }
