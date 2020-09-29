@@ -18,7 +18,11 @@
 
 package net.frontuari.component;
 
+import org.adempiere.base.event.IEventTopics;
+
 import net.frontuari.base.CustomEventFactory;
+import net.frontuari.event.ProductionEvents;
+import net.frontuari.model.FTUMProduction;
 
 /**
  * Event Factory
@@ -36,6 +40,7 @@ public class EventFactory extends CustomEventFactory {
 	 */
 	@Override
 	protected void initialize() {
+		// registerEvent(IEventTopics.DOC_BEFORE_COMPLETE, FTUMProduction.Table_Name, ProductionEvents.class);
 	}
 
 }

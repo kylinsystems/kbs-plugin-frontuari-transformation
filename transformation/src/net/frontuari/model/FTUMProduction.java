@@ -32,8 +32,11 @@ import org.compiere.model.MInOutLine;
 import org.compiere.model.MLocator;
 import org.compiere.model.MOrderLine;
 import org.compiere.model.MPeriod;
+import org.compiere.model.MPriceList;
+import org.compiere.model.MPriceListVersion;
 import org.compiere.model.MProduct;
 import org.compiere.model.MProductCategory;
+import org.compiere.model.MProductPrice;
 import org.compiere.model.MProduction;
 import org.compiere.model.MProductionLine;
 import org.compiere.model.MProductionLineMA;
@@ -157,6 +160,7 @@ public class FTUMProduction extends MProduction implements DocAction {
 				return DocAction.STATUS_Invalid;
 			}
 			processed = processed + lines.length;
+			UpdateCostPrices(lines);
 		} else {
 			Query planQuery = new Query(Env.getCtx(), I_M_ProductionPlan.Table_Name, "M_ProductionPlan.M_Production_ID=?", get_TrxName());
 			List<MProductionPlan> plans = planQuery.setParameters(getM_Production_ID()).list();
@@ -180,44 +184,6 @@ public class FTUMProduction extends MProduction implements DocAction {
 				plan.setProcessed(true);
 				plan.saveEx();
 			}
-		}
-		
-		
-		if(get_ValueAsString("TrxType").equalsIgnoreCase("T")){
-			/*BigDecimal diference = verifyTransformationQty(getLines());
-			if(diference.signum()!=0){
-				m_processMsg = "Las Cantidades a usadas no coinciden con las cantidades a transformar por :"+diference;
-				return DocAction.STATUS_Invalid;
-			}
-			/*String docNo = "";
-			
-			// id of transformation sequence 1001437
-			MSequence seq = new MSequence(getCtx(), 1001437, get_TrxName());
-			docNo= MSequence.getDocumentNoFromSeq(seq, get_TrxName(), this);
-			//set_ValueNoCheck 
-			set_ValueOfColumn("DocumentNo",docNo);*/
-			
-			/*
-			//BigDecimal cost = (BigDecimal)get_Value("PriceActual");//get_ValueAsBigDecimal("PriceActual");
-			//BigDecimal invoicePrice = (BigDecimal)get_Value("AmountInvoiced");//get_ValueAsBigDecimal("AmountInvoiced");
-
-
-			for(FTUMProductionLine line: getLines()){
-				
-					BigDecimal qtyUsed = line.getQtyUsed();//((BigDecimal)line.get_Value("qtyUsed")).setScale(4, BigDecimal.ROUND_UP);;//get_ValueAsBigDecimal("qtyUsed");
-				if(qtyUsed.compareTo(BigDecimal.ZERO)!=0){	
-					BigDecimal movementQty = line.getMovementQty();//((BigDecimal)line.get_Value("movementQty"));//get_ValueAsBigDecimal("movementQty");
-					BigDecimal lineInvoicePrice = invoicePrice.multiply(qtyUsed).setScale(4, RoundingMode.HALF_UP);				 
-					
-					lineInvoicePrice = lineInvoicePrice.divide(movementQty,4, RoundingMode.HALF_UP);		 
-					BigDecimal lineCost = cost.multiply(qtyUsed).setScale(4, RoundingMode.HALF_UP);
-					lineCost = lineCost.divide(movementQty,4, RoundingMode.HALF_UP);
-					line.set_ValueOfColumn("PriceActual",lineCost);
-					line.set_ValueOfColumn("PriceLastInv",lineInvoicePrice);
-					line.saveEx(get_TrxName());
-				}
-				
-			}*/
 		}
 		
 		//		User Validation
@@ -1512,9 +1478,51 @@ public int createLines(boolean mustBeStocked) {
 				setUser1_ID(User1_ID);
 			
 		}
+		if(is_ValueChanged("Discount")) {
+			//Update End Product Cost
+			/*String sqlU = "UPDATE M_ProductionLine pl SET PriceCost = (pf.PriceCost/pf.productionqty)*pf.Discount FROM "
+					+ " (SELECT SUM(ppl.PriceCost*(ppl.movementqty*-1)) AS PriceCost, pp.productionqty AS productionqty,"
+						+ " CASE WHEN Discount>0 THEN ((100-Discount)/100) ELSE 1 END AS Discount FROM M_ProductionLine ppl "
+					+ " JOIN M_Production pp ON ppl.M_Production_ID=pp.M_Production_ID"
+					+ " WHERE ppl.M_Product_ID <> "+ getM_Product_ID() +" AND ppl.M_Production_ID = "+getM_Production_ID()+" "
+							+ "GROUP BY pp.M_Production_ID,pp.productionqty,pp.Discount) pf"
+					+ " WHERE pl.M_Product_ID = "+ getM_Product_ID() +" AND pl.M_Production_ID = " + getM_Production_ID();
+			int cont = 0;
+				cont = DB.executeUpdate(sqlU, get_TrxName());*/
+		}
 			
 		
 		return true;
+	}
+	
+	protected void UpdateCostPrices(FTUMProductionLine[] lines) {
+		String sql = "SELECT PO_PriceList_ID FROM AD_OrgInfo WHERE AD_Org_ID="+getAD_Org_ID();
+		
+		int PO_PriceList_ID = DB.getSQLValue(get_TrxName(), sql);
+		if(PO_PriceList_ID>0) {
+			MPriceList list = new MPriceList(getCtx(),PO_PriceList_ID,get_TrxName());
+			MPriceListVersion version = list.getPriceListVersion(getMovementDate());
+			if(version==null) {
+				version = new MPriceListVersion(list);
+				int M_DiscountSchema_ID = DB.getSQLValue(get_TrxName(), "SELECT M_DiscountSchema_ID FROM M_DiscountSchema where AD_Client_ID="+getAD_Client_ID()+" AND AD_Org_ID IN (0,"+getAD_Org_ID()+")");
+				version.setM_DiscountSchema_ID(M_DiscountSchema_ID);
+				version.saveEx(get_TrxName());
+			}
+			for(FTUMProductionLine line:lines) {
+				if(!line.isEndProduct())
+					continue;
+				MProductPrice prodPrice = MProductPrice.get(getCtx(), version.get_ID(), line.getM_Product_ID(), get_TrxName());
+				if(prodPrice==null)
+					prodPrice = new MProductPrice(getCtx(),version.getM_PriceList_Version_ID(),line.getM_Product_ID(),get_TrxName());
+				BigDecimal cost = line.get_Value("PriceCost")!=null?(BigDecimal)line.get_Value("PriceCost"):BigDecimal.ZERO;
+				if(cost.compareTo(BigDecimal.ZERO)==0) 
+					throw new AdempiereException("El Producto:"+line.getM_Product().getName()+" no tiene un costo operativo");
+				prodPrice.setPrices(cost, cost, cost);
+				prodPrice.saveEx(get_TrxName());
+			}
+		}else {
+			throw new AdempiereException("No hay una lista de precios de configurada para la organización");
+		}		
 	}
 	
 	protected BigDecimal verifyTransformationQty(MProductionLine[] lines){

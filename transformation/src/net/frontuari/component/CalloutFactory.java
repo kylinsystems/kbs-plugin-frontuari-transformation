@@ -39,6 +39,7 @@ public class CalloutFactory extends CustomCalloutFactory {
 	@Override
 	protected void initialize() {
 		registerCallout(FTUMProduction.Table_Name, FTUMProduction.COLUMNNAME_M_Product_ID, FTUProductionCallout.class);
+		registerCallout(FTUMProduction.Table_Name, "Discount", FTUProductionCallout.class);
 	}
 
 }
