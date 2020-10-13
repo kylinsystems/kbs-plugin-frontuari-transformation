@@ -1514,7 +1514,23 @@ public int createLines(boolean mustBeStocked) {
 				MProductPrice prodPrice = MProductPrice.get(getCtx(), version.get_ID(), line.getM_Product_ID(), get_TrxName());
 				if(prodPrice==null)
 					prodPrice = new MProductPrice(getCtx(),version.getM_PriceList_Version_ID(),line.getM_Product_ID(),get_TrxName());
+
 				BigDecimal cost = line.get_Value("PriceCost")!=null?(BigDecimal)line.get_Value("PriceCost"):BigDecimal.ZERO;
+				sql = "SELECT 1 + (dsl.std_discount/100) from m_product p"
+						+ " JOIN m_discountschemaline dsl ON (dsl.m_product_id = p.m_product_id OR dsl.m_product_id IS NULL)"
+						+ "	AND (dsl.m_product_category_id = p.m_product_category_id OR dsl.m_product_category_id IS NULL)"
+						+ "	AND (dsl.classification = p.classification OR dsl.classification IS NULL)"
+						+ "	AND (dsl.group1 = p.group1 OR dsl.group1 IS NULL)"
+						+ "	AND (dsl.group2 = p.group2 OR dsl.group2 IS NULL)"
+						+ "	AND (dsl.FTU_ProductClassifications_ID = p.FTU_ProductClassifications_ID OR dsl.FTU_ProductClassifications_ID IS NULL)"
+						+ "	AND (dsl.FTU_ProductClassifications2_ID = p.FTU_ProductClassifications2_ID OR dsl.FTU_ProductClassifications2_ID IS NULL)"
+						+ "	AND (dsl.FTU_ProductClassifications3_ID = p.FTU_ProductClassifications3_ID OR dsl.FTU_ProductClassifications3_ID IS NULL)"
+						+ "	WHERE dsl.m_discountschema_id = "+version.getM_DiscountSchema_ID()+" AND p.m_product_id = "+line.getM_Product_ID();
+				
+				BigDecimal margin = DB.getSQLValueBD(get_TrxName(), sql);
+				if(margin.signum()!=0)
+					cost.multiply(margin).setScale(2, RoundingMode.HALF_UP);
+					
 				if(cost.compareTo(BigDecimal.ZERO)==0) 
 					throw new AdempiereException("El Producto:"+line.getM_Product().getName()+" no tiene un costo operativo");
 				prodPrice.setPrices(cost, cost, cost);
