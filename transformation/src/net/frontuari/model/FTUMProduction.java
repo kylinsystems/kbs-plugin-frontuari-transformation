@@ -1528,8 +1528,10 @@ public int createLines(boolean mustBeStocked) {
 						+ "	WHERE dsl.m_discountschema_id = "+version.getM_DiscountSchema_ID()+" AND p.m_product_id = "+line.getM_Product_ID();
 				
 				BigDecimal margin = DB.getSQLValueBD(get_TrxName(), sql);
-				if(margin.signum()!=0)
-					cost.multiply(margin).setScale(2, RoundingMode.HALF_UP);
+				if(margin==null)
+					continue;
+				else if(margin.signum()!=0)
+					cost = cost.divide(margin,list.getPricePrecision(),RoundingMode.HALF_UP);
 					
 				if(cost.compareTo(BigDecimal.ZERO)==0) 
 					throw new AdempiereException("El Producto:"+line.getM_Product().getName()+" no tiene un costo operativo");
