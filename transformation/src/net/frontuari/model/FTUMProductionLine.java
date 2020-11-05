@@ -489,7 +489,7 @@ public class FTUMProductionLine extends MProductionLine{
 	@Override
 	protected boolean beforeSave(boolean newRecord) 
 	{
-		int C_Currency_ID = Env.getContextAsInt(getCtx(), "$C_Currency_ID");
+		//int C_Currency_ID = Env.getContextAsInt(getCtx(), "$C_Currency_ID");
 		if (productionParent == null && getM_Production_ID() > 0)
 			productionParent = new FTUMProduction(getCtx(), getM_Production_ID(), get_TrxName());
 		BigDecimal qtyused = getQtyUsed();
@@ -497,6 +497,7 @@ public class FTUMProductionLine extends MProductionLine{
 			setQtyUsed(BigDecimal.ZERO);
 		}
 		int C_UOM_ID = get_ValueAsInt("C_UOM_ID");
+		MUOM UOM = new MUOM (getCtx(),C_UOM_ID,get_TrxName());
 		MProduct prod = new MProduct(getCtx(),getM_Product_ID(),get_TrxName());
 		String trxType = productionParent.get_ValueAsString("TrxType");
 		 
@@ -516,7 +517,7 @@ public class FTUMProductionLine extends MProductionLine{
 							String sql = "SELECT DivideRate FROM C_UOM_Conversion WHERE M_Product_ID="+prod.getM_Product_ID()+" AND C_UOM_ID="+prod.getC_UOM_ID()+" AND C_UOM_To_ID="+C_UOM_ID;
 							BigDecimal multiplyrate = DB.getSQLValueBD(get_TrxName(), sql);
 							if(multiplyrate.compareTo(BigDecimal.ZERO)>0) {						
-								movementQty = movementQty.multiply(multiplyrate).setScale(2, RoundingMode.HALF_UP);
+								movementQty = movementQty.multiply(multiplyrate).setScale(UOM.getCostingPrecision(), RoundingMode.HALF_UP);
 								setMovementQty(movementQty);
 							}
 						}else
@@ -533,14 +534,14 @@ public class FTUMProductionLine extends MProductionLine{
 					
 					BigDecimal qtyUsed = getQtyUsed();
 					
-					movementQty = conversionFactor.multiply(qtyUsed).setScale(2, RoundingMode.HALF_UP);
+					movementQty = conversionFactor.multiply(qtyUsed).setScale(UOM.getStdPrecision(), RoundingMode.HALF_UP);
 					
 					if(C_UOM_ID>0){
 						if(prod.getC_UOM_ID()!=C_UOM_ID) {
 							String sql = "SELECT DivideRate FROM C_UOM_Conversion WHERE M_Product_ID="+prod.getM_Product_ID()+" AND C_UOM_ID="+prod.getC_UOM_ID()+" AND C_UOM_To_ID="+C_UOM_ID;
 							BigDecimal multiplyrate = DB.getSQLValueBD(get_TrxName(), sql);
 							if(multiplyrate.compareTo(BigDecimal.ZERO)>0) {						
-								movementQty = movementQty.multiply(multiplyrate).setScale(MUOM.getPrecision(getCtx(), prod.getC_UOM_ID()), RoundingMode.HALF_UP);
+								movementQty = movementQty.multiply(multiplyrate).setScale(UOM.getStdPrecision(), RoundingMode.HALF_UP);
 								setMovementQty(movementQty);
 							}
 						}else
@@ -550,7 +551,7 @@ public class FTUMProductionLine extends MProductionLine{
 
 					if(is_ValueChanged("M_Product_ID")) {
 						cost = getPurchaseProductCost(productionParent.getM_Product_ID(),getAD_Org_ID());
-						cost = cost.divide((conversionFactor != null && conversionFactor.compareTo(BigDecimal.ZERO) > 0)?conversionFactor:BigDecimal.ONE,MCurrency.getStdPrecision(getCtx(), C_Currency_ID), RoundingMode.HALF_UP);
+						cost = cost.divide((conversionFactor != null && conversionFactor.compareTo(BigDecimal.ZERO) > 0)?conversionFactor:BigDecimal.ONE,UOM.getCostingPrecision(), RoundingMode.HALF_UP);
 						if(cost.compareTo(BigDecimal.ZERO)>0)
 							set_ValueOfColumn("PriceCost", cost);
 					}
@@ -567,7 +568,7 @@ public class FTUMProductionLine extends MProductionLine{
 							BigDecimal multiplyrate = DB.getSQLValueBD(get_TrxName(), sql);
 							if(multiplyrate.compareTo(BigDecimal.ZERO)>0) {
 								BigDecimal base = getPlannedQty();
-								base = base.multiply(multiplyrate).setScale(MUOM.getPrecision(getCtx(), prod.getC_UOM_ID()), RoundingMode.HALF_UP);
+								base = base.multiply(multiplyrate).setScale(UOM.getStdPrecision(), RoundingMode.HALF_UP);
 								setMovementQty(base);
 							}
 						}
@@ -581,7 +582,7 @@ public class FTUMProductionLine extends MProductionLine{
 							BigDecimal multiplyrate = DB.getSQLValueBD(get_TrxName(), sql);
 							if(multiplyrate.compareTo(BigDecimal.ZERO)>0) {
 								BigDecimal base = getQtyUsed();
-								base = base.multiply(multiplyrate).setScale(MUOM.getPrecision(getCtx(), prod.getC_UOM_ID()), RoundingMode.HALF_UP);
+								base = base.multiply(multiplyrate).setScale(UOM.getStdPrecision(), RoundingMode.HALF_UP);
 								setMovementQty(base.negate());
 							}
 						}else
