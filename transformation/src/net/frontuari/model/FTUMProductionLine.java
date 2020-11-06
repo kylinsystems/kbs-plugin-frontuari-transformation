@@ -496,9 +496,12 @@ public class FTUMProductionLine extends MProductionLine{
 		if(qtyused==null||qtyused.compareTo(BigDecimal.ZERO)==0){
 			setQtyUsed(BigDecimal.ZERO);
 		}
-		int C_UOM_ID = get_ValueAsInt("C_UOM_ID");
-		MUOM UOM = new MUOM (getCtx(),C_UOM_ID,get_TrxName());
 		MProduct prod = new MProduct(getCtx(),getM_Product_ID(),get_TrxName());
+
+		int C_UOM_ID = get_ValueAsInt("C_UOM_ID");
+		if(C_UOM_ID>0)
+			C_UOM_ID=prod.getC_UOM_ID();
+		MUOM UOM = new MUOM (getCtx(),C_UOM_ID,get_TrxName());
 		String trxType = productionParent.get_ValueAsString("TrxType");
 		 
 		boolean isTransformation = trxType.equalsIgnoreCase("T");
@@ -517,7 +520,7 @@ public class FTUMProductionLine extends MProductionLine{
 							String sql = "SELECT DivideRate FROM C_UOM_Conversion WHERE M_Product_ID="+prod.getM_Product_ID()+" AND C_UOM_ID="+prod.getC_UOM_ID()+" AND C_UOM_To_ID="+C_UOM_ID;
 							BigDecimal multiplyrate = DB.getSQLValueBD(get_TrxName(), sql);
 							if(multiplyrate.compareTo(BigDecimal.ZERO)>0) {						
-								movementQty = movementQty.multiply(multiplyrate).setScale(UOM.getCostingPrecision(), RoundingMode.HALF_UP);
+								movementQty = movementQty.multiply(multiplyrate).setScale(UOM.getStdPrecision(), RoundingMode.HALF_UP);
 								setMovementQty(movementQty);
 							}
 						}else
@@ -551,7 +554,9 @@ public class FTUMProductionLine extends MProductionLine{
 
 					if(is_ValueChanged("M_Product_ID")) {
 						cost = getPurchaseProductCost(productionParent.getM_Product_ID(),getAD_Org_ID());
-						cost = cost.divide((conversionFactor != null && conversionFactor.compareTo(BigDecimal.ZERO) > 0)?conversionFactor:BigDecimal.ONE,UOM.getCostingPrecision(), RoundingMode.HALF_UP);
+						cost = cost.multiply(getQtyUsed()).setScale(UOM.getCostingPrecision(), RoundingMode.HALF_UP);
+						cost = cost.divide(movementQty, UOM.getCostingPrecision(), RoundingMode.HALF_UP);						
+						//cost = cost.divide((conversionFactor != null && conversionFactor.compareTo(BigDecimal.ZERO) > 0)?conversionFactor:BigDecimal.ONE,UOM.getCostingPrecision(), RoundingMode.HALF_UP);
 						if(cost.compareTo(BigDecimal.ZERO)>0)
 							set_ValueOfColumn("PriceCost", cost);
 					}
