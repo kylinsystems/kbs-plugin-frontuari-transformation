@@ -229,10 +229,10 @@ public class Doc_Transformation extends Doc_Production{
 							costs = parentCosts;
 						}else {
 							BigDecimal movementQty= prodLine.getMovementQty();
-							BigDecimal factor = qtyUsed.divide(movementQty,8, RoundingMode.HALF_UP);
+							BigDecimal factor = qtyUsed.divide(movementQty,curr.getCostingPrecision(), RoundingMode.HALF_UP);
 							costs = (unitParentCosts)//.divide(qtyUsed,8, RoundingMode.HALF_UP))
-							.multiply(factor).setScale(8, RoundingMode.HALF_UP);
-							costs = costs.multiply(movementQty).setScale(8, RoundingMode.HALF_UP);
+							.multiply(factor).setScale(curr.getCostingPrecision(), RoundingMode.HALF_UP);
+							costs = costs.multiply(movementQty).setScale(curr.getCostingPrecision(), RoundingMode.HALF_UP);
 						}
 					
 					}*/
@@ -248,10 +248,10 @@ public class Doc_Transformation extends Doc_Production{
 							costs = parentCosts;
 						}else {
 							BigDecimal movementQty= prodLine.getMovementQty();
-							BigDecimal factor = qtyUsed.divide(movementQty,8, RoundingMode.HALF_UP);
+							BigDecimal factor = qtyUsed.divide(movementQty,curr.getCostingPrecision(), RoundingMode.HALF_UP);
 							costs = (unitParentCosts)//.divide(qtyUsed,8, RoundingMode.HALF_UP))
-							.multiply(factor).setScale(8, RoundingMode.HALF_UP);
-							costs = costs.multiply(movementQty).setScale(8, RoundingMode.HALF_UP);
+							.multiply(factor).setScale(curr.getCostingPrecision(), RoundingMode.HALF_UP);
+							costs = costs.multiply(movementQty).setScale(curr.getCostingPrecision(), RoundingMode.HALF_UP);
 						}
 					
 					}				
