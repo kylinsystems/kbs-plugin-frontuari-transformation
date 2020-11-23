@@ -13,7 +13,7 @@ public class FTUProductionCallout extends CustomCallout{
 	@Override
 	protected String start() {
 		String colummName = getColumnName();
-		if(colummName.equalsIgnoreCase("M_Product_ID")) {
+		if(colummName.equalsIgnoreCase("M_Product_ID") && getValue() != null) {
 			int M_Product_ID = (int)getValue();
 			if(M_Product_ID>0) {
 				MProduct prod = new MProduct(getCtx(),M_Product_ID,null);
