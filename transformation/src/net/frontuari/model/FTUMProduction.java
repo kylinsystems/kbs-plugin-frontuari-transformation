@@ -21,6 +21,7 @@ import org.compiere.util.AdempiereUserError;
 import org.compiere.util.CLogger;
 import org.compiere.util.DB;
 import org.compiere.util.Env;
+import org.compiere.util.KeyNamePair;
 import org.compiere.util.Util;
 import org.compiere.model.I_M_InOutLine;
 import org.compiere.model.I_M_ProductionPlan;
@@ -31,6 +32,8 @@ import org.compiere.model.MDocType;
 import org.compiere.model.MInOutLine;
 import org.compiere.model.MLocator;
 import org.compiere.model.MOrderLine;
+import org.compiere.model.MOrg;
+import org.compiere.model.MOrgInfo;
 import org.compiere.model.MPeriod;
 import org.compiere.model.MPriceList;
 import org.compiere.model.MPriceListVersion;
@@ -1004,8 +1007,9 @@ public int createLines(boolean mustBeStocked) {
 		//	Std Period open?
 		MPeriod.testPeriodOpen(getCtx(), getMovementDate(), MDocType.DOCBASETYPE_MaterialProduction, getAD_Org_ID());
 		
-		boolean isTransformation = get_ValueAsString("TrxType").equalsIgnoreCase("T");
+		ValidateExistanceOfPricipalProductInLines();
 		
+		boolean isTransformation = get_ValueAsString("TrxType").equalsIgnoreCase("T");
 		if ( getIsCreated().equals("N") )
 		{
 			//m_processMsg = "Not created";
@@ -1496,51 +1500,63 @@ public int createLines(boolean mustBeStocked) {
 	}
 	
 	protected void UpdateCostPrices(FTUMProductionLine[] lines) {
-		String sql = "SELECT PO_PriceList_ID FROM AD_OrgInfo WHERE AD_Org_ID="+getAD_Org_ID();
-		
-		int PO_PriceList_ID = DB.getSQLValue(get_TrxName(), sql);
-		if(PO_PriceList_ID>0) {
-			MPriceList list = new MPriceList(getCtx(),PO_PriceList_ID,get_TrxName());
-			MPriceListVersion version = list.getPriceListVersion(getMovementDate());
-			if(version==null) {
-				version = new MPriceListVersion(list);
-				int M_DiscountSchema_ID = DB.getSQLValue(get_TrxName(), "SELECT M_DiscountSchema_ID FROM M_DiscountSchema where AD_Client_ID="+getAD_Client_ID()+" AND AD_Org_ID IN (0,"+getAD_Org_ID()+")");
-				version.setM_DiscountSchema_ID(M_DiscountSchema_ID);
-				version.saveEx(get_TrxName());
-			}
-			for(FTUMProductionLine line:lines) {
-				if(!line.isEndProduct())
-					continue;
-				MProductPrice prodPrice = MProductPrice.get(getCtx(), version.get_ID(), line.getM_Product_ID(), get_TrxName());
-				if(prodPrice==null)
-					prodPrice = new MProductPrice(getCtx(),version.getM_PriceList_Version_ID(),line.getM_Product_ID(),get_TrxName());
+		String sql = "SELECT PO_PriceList_ID, IsSalesOrg FROM AD_OrgInfo WHERE AD_Org_ID= ? ";//+invoice.getAD_Org_ID()
+		KeyNamePair[]values = DB.getKeyNamePairs(get_TrxName(), sql,false,getAD_Org_ID()); 
+		boolean IsSalesOrg = values[0].getName().equals("Y");
+		if(IsSalesOrg) {
+			int PO_PriceList_ID = values[0].getKey();
+			//int PO_PriceList_ID = DB.getSQLValue(get_TrxName(), sql);
+			if(PO_PriceList_ID>0) {
+				MPriceList list = new MPriceList(getCtx(),PO_PriceList_ID,get_TrxName());
+				MPriceListVersion version = list.getPriceListVersion(getMovementDate());
+				if(version==null) {
+					version = new MPriceListVersion(list);
+					int M_DiscountSchema_ID = DB.getSQLValue(get_TrxName(), "SELECT M_DiscountSchema_ID FROM M_DiscountSchema where AD_Client_ID="+getAD_Client_ID()+" AND AD_Org_ID IN (0,"+getAD_Org_ID()+")");
+					version.setM_DiscountSchema_ID(M_DiscountSchema_ID);
+					version.saveEx(get_TrxName());
+				}
+				for(FTUMProductionLine line:lines) {
+					if(!line.isEndProduct())
+						continue;
+					MProductPrice prodPrice = MProductPrice.get(getCtx(), version.get_ID(), line.getM_Product_ID(), get_TrxName());
+					if(prodPrice==null)
+						prodPrice = new MProductPrice(getCtx(),version.getM_PriceList_Version_ID(),line.getM_Product_ID(),get_TrxName());
 
-				BigDecimal cost = line.get_Value("PriceCost")!=null?(BigDecimal)line.get_Value("PriceCost"):BigDecimal.ZERO;
-				sql = "SELECT 1 + (dsl.std_discount/100) from m_product p"
-						+ " JOIN m_discountschemaline dsl ON (dsl.m_product_id = p.m_product_id OR dsl.m_product_id IS NULL)"
-						+ "	AND (dsl.m_product_category_id = p.m_product_category_id OR dsl.m_product_category_id IS NULL)"
-						+ "	AND (dsl.classification = p.classification OR dsl.classification IS NULL)"
-						+ "	AND (dsl.group1 = p.group1 OR dsl.group1 IS NULL)"
-						+ "	AND (dsl.group2 = p.group2 OR dsl.group2 IS NULL)"
-						+ "	AND (dsl.FTU_ProductClassifications_ID = p.FTU_ProductClassifications_ID OR dsl.FTU_ProductClassifications_ID IS NULL)"
-						+ "	AND (dsl.FTU_ProductClassifications2_ID = p.FTU_ProductClassifications2_ID OR dsl.FTU_ProductClassifications2_ID IS NULL)"
-						+ "	AND (dsl.FTU_ProductClassifications3_ID = p.FTU_ProductClassifications3_ID OR dsl.FTU_ProductClassifications3_ID IS NULL)"
-						+ "	WHERE dsl.m_discountschema_id = "+version.getM_DiscountSchema_ID()+" AND p.m_product_id = "+line.getM_Product_ID();
-				
-				BigDecimal margin = DB.getSQLValueBD(get_TrxName(), sql);
-				if(margin==null)
-					continue;
-				else if(margin.signum()!=0)
-					cost = cost.divide(margin,list.getPricePrecision(),RoundingMode.HALF_UP);
+					BigDecimal cost = line.get_Value("PriceCost")!=null?(BigDecimal)line.get_Value("PriceCost"):BigDecimal.ZERO;
+					sql = "SELECT 1 + (dsl.std_discount/100) from m_product p"
+							+ " JOIN m_discountschemaline dsl ON (dsl.m_product_id = p.m_product_id OR dsl.m_product_id IS NULL)"
+							+ "	AND (dsl.m_product_category_id = p.m_product_category_id OR dsl.m_product_category_id IS NULL)"
+							+ "	AND (dsl.classification = p.classification OR dsl.classification IS NULL)"
+							+ "	AND (dsl.group1 = p.group1 OR dsl.group1 IS NULL)"
+							+ "	AND (dsl.group2 = p.group2 OR dsl.group2 IS NULL)"
+							+ "	AND (dsl.FTU_ProductClassifications_ID = p.FTU_ProductClassifications_ID OR dsl.FTU_ProductClassifications_ID IS NULL)"
+							+ "	AND (dsl.FTU_ProductClassifications2_ID = p.FTU_ProductClassifications2_ID OR dsl.FTU_ProductClassifications2_ID IS NULL)"
+							+ "	AND (dsl.FTU_ProductClassifications3_ID = p.FTU_ProductClassifications3_ID OR dsl.FTU_ProductClassifications3_ID IS NULL)"
+							+ "	WHERE dsl.m_discountschema_id = "+version.getM_DiscountSchema_ID()+" AND p.m_product_id = "+line.getM_Product_ID();
 					
-				if(cost.compareTo(BigDecimal.ZERO)==0) 
-					throw new AdempiereException("El Producto:"+line.getM_Product().getName()+" no tiene un costo operativo");
-				prodPrice.setPrices(cost, cost, cost);
-				prodPrice.saveEx(get_TrxName());
-			}
-		}else {
-			throw new AdempiereException("No hay una lista de precios de configurada para la organización");
-		}		
+					BigDecimal margin = DB.getSQLValueBD(get_TrxName(), sql);
+					if(margin==null)
+						continue;
+					else if(margin.signum()!=0)
+						cost = cost.divide(margin,list.getPricePrecision(),RoundingMode.HALF_UP);
+						
+					if(cost.compareTo(BigDecimal.ZERO)==0) 
+						throw new AdempiereException("El Producto:"+line.getM_Product().getName()+" no tiene un costo operativo");
+					prodPrice.setPrices(cost, cost, cost);
+					prodPrice.saveEx(get_TrxName());
+				}
+			}else {
+				throw new AdempiereException("No hay una lista de precios de configurada para la organización");
+			}	
+		}
+			
+	}
+	
+	public void ValidateExistanceOfPricipalProductInLines() {
+		String sql="SELECT M_ProductionLine_ID FROM M_ProductionLine WHERE M_Production_ID="+getM_Production_ID()+" AND M_Product_ID="+getM_Product_ID();
+		int M_ProductionLine_ID = DB.getSQLValue(get_TrxName(), sql);
+		if(M_ProductionLine_ID<=0)
+			throw new AdempiereException("No hay una linea que corresponda al producto del encabezado");
 	}
 	
 	protected BigDecimal verifyTransformationQty(MProductionLine[] lines){

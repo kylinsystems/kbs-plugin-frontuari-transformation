@@ -13,6 +13,7 @@ import org.compiere.util.DB;
 import org.compiere.util.Env;
 import org.compiere.util.Msg;
 import org.compiere.util.Util;
+import org.adempiere.exceptions.AdempiereException;
 import org.compiere.model.I_M_ProductionPlan;
 import org.compiere.model.MAttributeSetInstance;
 import org.compiere.model.MCurrency;
@@ -707,7 +708,6 @@ public class FTUMProductionLine extends MProductionLine{
 
 	@Override
 	protected boolean beforeDelete() {
-		
 		deleteMA();
 		return true;
 	}
