@@ -1294,6 +1294,7 @@ public int createLines(boolean mustBeStocked) {
 			}
 		}
 
+		//reversal.setIsCreated("Y"); Biomercados no quiere que se pueda reversar, al estar esto comentado da error al reversar 
 		if (!reversal.processIt(DocAction.ACTION_Complete))
 		{
 			m_processMsg = "Reversal ERROR: " + reversal.getProcessMsg();
